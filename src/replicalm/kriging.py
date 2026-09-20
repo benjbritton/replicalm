@@ -74,12 +74,39 @@ MODELS = {"linear": _linear, "spherical": _spherical,
 
 
 def fit_variogram(x, y, z, model="spherical", n_lags=12, max_lag=None,
-                  sample=20000, seed=0):
+                  sample=20000, seed=0, min_nugget_fraction=0.0):
     """Fit an empirical variogram, so the model is measured rather than guessed.
 
     Subsamples before computing pairwise distances: the empirical variogram is a
     summary and does not improve past a few thousand points, whereas the pair
     count grows with the square.
+
+    `min_nugget_fraction` floors the nugget at a fraction of the total sill.
+
+    WHY A FLOOR IS AVAILABLE AT ALL
+    -------------------------------
+    The fit chooses among nuggets of 0, 5% and 10% of the sill, and on this data
+    it picks exactly zero more often than not: 34 of 60 fits across ten tiles. A
+    variogram with no nugget makes ordinary kriging an exact interpolator -- it
+    honors every observation, so per-return ranging noise becomes single-cell
+    spikes in the raster. At four points per square meter with sixteen neighbors
+    inside about 1.2 m, each cell is decided by one or two returns and there is
+    nothing to average against.
+
+    Roughness on flat ground, against the reference surface from the original
+    workflow, measured on the l0s395 trench window:
+
+        0%  1.26x    2%  1.09x    4%  0.99x    6%  0.92x   20%  0.72x
+        1%  1.16x    3%  1.04x    5%  0.96x   10%  0.83x
+
+    Four per cent is where the output carries the same micro-relief the original
+    workflow did; below it the surface is sharper than the reference, above it
+    smoother.
+
+    The default is 0.0, so nothing changes unless a caller asks. This is not in
+    the locked baseline: it was measured on one window of one tile, and the
+    visual half of that comparison is not yet valid, because G1 normalizes each
+    raster by its own extremes and one outlier cell restretches the whole image.
     """
     rng_ = np.random.default_rng(seed)
     n = len(z)
@@ -124,14 +151,23 @@ def fit_variogram(x, y, z, model="spherical", n_lags=12, max_lag=None,
                 err = float(((pred - semi) ** 2).sum())
                 if err < best:
                     best, params = err, (nug, sill0 - nug, rng_try)
+        # The floor is applied after fitting rather than inside the search, so
+        # the reported fit stays the fit and the floor stays a stated choice.
+        if min_nugget_fraction > 0:
+            nug, psill, rng_ = params
+            total = nug + psill
+            floor = min_nugget_fraction * total
+            if nug < floor:
+                params = (floor, total - floor, rng_)
     return {"model": model, "params": params, "lags": lag.tolist(),
             "semivariance": semi.tolist(), "counts": cnt,
-            "pairs_used": int(len(pairs))}
+            "pairs_used": int(len(pairs)),
+            "min_nugget_fraction": float(min_nugget_fraction)}
 
 
 def krige_grid(x, y, z, grid, radius=20.0, max_points=32, min_points=3,
                model="spherical", variogram=None, nodata=-9999.0,
-               verbose=True):
+               verbose=True, chunk_cells=1000000):
     """Ordinary kriging of scattered points onto a declared grid.
 
     Cells with fewer than `min_points` neighbours inside the radius are left as
@@ -151,76 +187,95 @@ def krige_grid(x, y, z, grid, radius=20.0, max_points=32, min_points=3,
     p = variogram["params"]
 
     tree = cKDTree(np.c_[x, y])
-    gx, gy = grid.cell_centres()
-    flat = np.c_[gx.ravel(), gy.ravel()]
-    out = np.full(len(flat), nodata, float)
+    n_cells = grid.height * grid.width
+    out = np.full(n_cells, nodata, float)
+    var = np.full(n_cells, nodata, float)
 
-    # one query for every cell, capped at max_points, bounded by the radius
-    dist, idx = tree.query(flat, k=min(max_points, len(z)),
-                           distance_upper_bound=radius)
-    if dist.ndim == 1:
-        dist, idx = dist[:, None], idx[:, None]
+    # THE NEIGHBOUR QUERY IS WHAT BOUNDS MEMORY, SO IT IS CHUNKED
+    #
+    # Querying every cell at once allocates two arrays of cells x max_points.
+    # On a full G-LiHT tile -- 46 million cells at 0.5 m, sixteen neighbours --
+    # that is about 12 GB of distances and indices before a single cell is
+    # solved, which is the reason tile processing was blocked at 1 km in the
+    # first place. Chunking by rows bounds it at roughly `chunk_cells` x
+    # max_points regardless of how large the grid is, so the block size becomes
+    # a choice about the method rather than a limit of the machine.
+    #
+    # Results are identical: the same cells, the same neighbours, the same
+    # solves, in the same order.
+    k_use = min(max_points, len(z))
+    rows_per_chunk = max(1, int(chunk_cells // max(grid.width, 1)))
+    xs = grid.origin_x + (np.arange(grid.width) + 0.5) * grid.cell
 
-    var = np.full(len(flat), nodata, float)
     filled = 0
     n_fallback = 0
-    for c in range(len(flat)):
-        d = dist[c]
-        good = np.isfinite(d)
-        k = int(good.sum())
-        if k < min_points:
-            continue
-        ii = idx[c][good]
-        px, py, pz = x[ii], y[ii], z[ii]
+    for r0 in range(0, grid.height, rows_per_chunk):
+        r1 = min(r0 + rows_per_chunk, grid.height)
+        ys = grid.origin_y - (np.arange(r0, r1) + 0.5) * grid.dy
+        cxs, cys = np.meshgrid(xs, ys)
+        chunk = np.c_[cxs.ravel(), cys.ravel()]
+        dist, idx = tree.query(chunk, k=k_use, distance_upper_bound=radius)
+        if dist.ndim == 1:
+            dist, idx = dist[:, None], idx[:, None]
+        base = r0 * grid.width
+        for j in range(len(chunk)):
+            c = base + j
+            d = dist[j]
+            good = np.isfinite(d)
+            k = int(good.sum())
+            if k < min_points:
+                continue
+            ii = idx[j][good]
+            px, py, pz = x[ii], y[ii], z[ii]
 
-        # pairwise lags among the neighbours, and to the cell centre
-        dxy = np.hypot(px[:, None] - px[None, :], py[:, None] - py[None, :])
-        G = mdl(dxy, *p)
-        g0 = mdl(d[good], *p)
+            # pairwise lags among the neighbours, and to the cell centre
+            dxy = np.hypot(px[:, None] - px[None, :], py[:, None] - py[None, :])
+            G = mdl(dxy, *p)
+            g0 = mdl(d[good], *p)
 
-        # ordinary kriging system with the unbiasedness constraint
-        A = np.empty((k + 1, k + 1))
-        A[:k, :k] = G
-        A[:k, k] = 1.0
-        A[k, :k] = 1.0
-        A[k, k] = 0.0
-        b = np.empty(k + 1)
-        b[:k] = g0
-        b[k] = 1.0
-        # An ordinary kriging estimate interpolates its neighbours and cannot
-        # legitimately fall outside their range. When it does, the system was
-        # degenerate: this happens where the search radius is large relative to
-        # the correlation range and the neighbours are packed tightly, so every
-        # pairwise semivariance is nearly identical and the matrix loses rank.
-        # On two of three calibration tiles -- ranges of 1.5 and 1.8 m against a
-        # 3 m floor, one of them at 10 points per square metre -- the lstsq
-        # fallback returned weights that produced values of order 1e15.
-        #
-        # The fallback is inverse-distance over the same neighbours: bounded by
-        # construction, and a defensible estimate for a cell whose neighbours
-        # carry no distinguishable spatial structure.
-        try:
-            w = np.linalg.solve(A, b)
-            est = float(w[:k] @ pz)
-            degenerate = not np.isfinite(est) or est < pz.min() or est > pz.max()
-        except np.linalg.LinAlgError:
-            degenerate = True
-        if degenerate:
-            dd = np.maximum(d[good], 1e-9)
-            ww = 1.0 / dd ** 2
-            est = float((ww @ pz) / ww.sum())
-            n_fallback += 1
-            # inverse distance carries no covariance model, so there is no
-            # variance to report. Left as nodata rather than filled with a
-            # number that would look like an uncertainty estimate.
-        else:
-            # ordinary kriging variance: the weights against the cell-to-point
-            # semivariances, plus the Lagrange multiplier. This is the quantity
-            # that distinguishes a modelled estimate from a weighted average,
-            # and it is what a fallback cell does not have.
-            var[c] = float(w[:k] @ g0 + w[k])
-        out[c] = est
-        filled += 1
+            # ordinary kriging system with the unbiasedness constraint
+            A = np.empty((k + 1, k + 1))
+            A[:k, :k] = G
+            A[:k, k] = 1.0
+            A[k, :k] = 1.0
+            A[k, k] = 0.0
+            b = np.empty(k + 1)
+            b[:k] = g0
+            b[k] = 1.0
+            # An ordinary kriging estimate interpolates its neighbours and cannot
+            # legitimately fall outside their range. When it does, the system was
+            # degenerate: this happens where the search radius is large relative to
+            # the correlation range and the neighbours are packed tightly, so every
+            # pairwise semivariance is nearly identical and the matrix loses rank.
+            # On two of three calibration tiles -- ranges of 1.5 and 1.8 m against a
+            # 3 m floor, one of them at 10 points per square metre -- the lstsq
+            # fallback returned weights that produced values of order 1e15.
+            #
+            # The fallback is inverse-distance over the same neighbours: bounded by
+            # construction, and a defensible estimate for a cell whose neighbours
+            # carry no distinguishable spatial structure.
+            try:
+                w = np.linalg.solve(A, b)
+                est = float(w[:k] @ pz)
+                degenerate = not np.isfinite(est) or est < pz.min() or est > pz.max()
+            except np.linalg.LinAlgError:
+                degenerate = True
+            if degenerate:
+                dd = np.maximum(d[good], 1e-9)
+                ww = 1.0 / dd ** 2
+                est = float((ww @ pz) / ww.sum())
+                n_fallback += 1
+                # inverse distance carries no covariance model, so there is no
+                # variance to report. Left as nodata rather than filled with a
+                # number that would look like an uncertainty estimate.
+            else:
+                # ordinary kriging variance: the weights against the cell-to-point
+                # semivariances, plus the Lagrange multiplier. This is the quantity
+                # that distinguishes a modelled estimate from a weighted average,
+                # and it is what a fallback cell does not have.
+                var[c] = float(w[:k] @ g0 + w[k])
+            out[c] = est
+            filled += 1
 
     dem = out.reshape(grid.height, grid.width)
     variance = var.reshape(grid.height, grid.width)
@@ -228,7 +283,7 @@ def krige_grid(x, y, z, grid, radius=20.0, max_points=32, min_points=3,
     if verbose:
         print("  kriged %d of %d cells (%.1f%%), radius %.1f m, "
               "%d nearest, %s variogram%s"
-              % (filled, len(flat), 100 * filled / len(flat), radius,
+              % (filled, n_cells, 100 * filled / max(n_cells, 1), radius,
                  max_points, variogram["model"],
                  "" if not n_fallback
                  else ", %d cells (%.1f%%) fell back to inverse distance"

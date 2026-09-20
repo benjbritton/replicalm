@@ -76,6 +76,10 @@ MAX_LAG = 10.0          # only the variogram SHAPE is taken from this
 # not 16 neighbours to find at 4 points per square metre, and coverage fails
 # instead of accuracy.
 RADIUS_M = float(sys.argv[1]) if len(sys.argv) > 1 else 1.5
+# Nugget floor as a fraction of sill, argv[3]. Zero reproduces the locked
+# baseline. Four per cent is where flat-ground roughness matched the reference
+# on the l0s395 trench window; see kriging.fit_variogram.
+NUGGET_FRACTION = float(sys.argv[3]) if len(sys.argv) > 3 else 0.0
 MIN_GROUND = 500
 for d in (WORK, os.path.dirname(DEM_OUT)):
     os.makedirs(d, exist_ok=True)
@@ -167,11 +171,16 @@ for n, (i, j) in enumerate(blocks, 1):
             sel = np.random.default_rng(20260919).choice(len(z), 20000,
                                                          replace=False)
             variogram = K.fit_variogram(x[sel], y[sel], z[sel],
-                                        model="spherical", max_lag=MAX_LAG)
+                                        model="spherical", max_lag=MAX_LAG,
+                                        min_nugget_fraction=NUGGET_FRACTION)
             radius = RADIUS_M
             print("    variogram fitted on block %d,%d: range %.2f m; "
                   "search radius set to %.2f m (not derived), every block"
                   % (i, j, variogram["params"][2], radius))
+            if NUGGET_FRACTION:
+                print("    nugget floored at %.0f%% of sill -> %.5f (kriging "
+                      "smooths instead of interpolating exactly)"
+                      % (100 * NUGGET_FRACTION, variogram["params"][0]))
         if variogram is None:
             print("[%2d/%d] %5d,%-5d too few points to fit on yet, deferred"
                   % (n, len(blocks), i, j))

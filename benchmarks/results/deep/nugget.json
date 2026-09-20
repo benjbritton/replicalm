@@ -1,0 +1,53 @@
+{
+ "reference_roughness": 0.029190646469149716,
+ "arms": [
+  {
+   "nugget_fraction": 0.0,
+   "roughness": 0.03666886122219792,
+   "roughness_vs_ref": 1.256185307884551,
+   "rmse": 0.08249247768011055,
+   "over20": 0.01855040266592613,
+   "dem": "${ROOT}\\render_ncalm\\nugget\\nug000\\tile\\l0s395_nug000_DEM_0p5m_v1.tif",
+   "tag": "nug000",
+   "stage_root": "${ROOT}\\render_ncalm\\nugget\\nug000",
+   "fallback": 0.001304,
+   "freckles": null
+  },
+  {
+   "nugget_fraction": 0.05,
+   "roughness": 0.027904778406289257,
+   "roughness_vs_ref": 0.9559493119064891,
+   "rmse": 0.06643113573202994,
+   "over20": 0.008127372026288994,
+   "dem": "${ROOT}\\render_ncalm\\nugget\\nug005\\tile\\l0s395_nug005_DEM_0p5m_v1.tif",
+   "tag": "nug005",
+   "stage_root": "${ROOT}\\render_ncalm\\nugget\\nug005",
+   "fallback": 0.000696,
+   "freckles": null
+  },
+  {
+   "nugget_fraction": 0.1,
+   "roughness": 0.02427918909503663,
+   "roughness_vs_ref": 0.8317455086407975,
+   "rmse": 0.06271779046833457,
+   "over20": 0.005405905766916597,
+   "dem": "${ROOT}\\render_ncalm\\nugget\\nug010\\tile\\l0s395_nug010_DEM_0p5m_v1.tif",
+   "tag": "nug010",
+   "stage_root": "${ROOT}\\render_ncalm\\nugget\\nug010",
+   "fallback": 0.000664,
+   "freckles": null
+  },
+  {
+   "nugget_fraction": 0.2,
+   "roughness": 0.02109186265029935,
+   "roughness_vs_ref": 0.7225555169732328,
+   "rmse": 0.06133292131053037,
+   "over20": 0.003832268814218273,
+   "dem": "${ROOT}\\render_ncalm\\nugget\\nug020\\tile\\l0s395_nug020_DEM_0p5m_v1.tif",
+   "tag": "nug020",
+   "stage_root": "${ROOT}\\render_ncalm\\nugget\\nug020",
+   "fallback": 0.000668,
+   "freckles": null
+  }
+ ]
+}

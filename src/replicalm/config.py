@@ -125,9 +125,19 @@ class GroundPass:
 class ReplicalmConfig:
     """A complete run. Serialise it beside the output so a result is explainable."""
 
-    # tiling, step 1 and 2 of the source
-    tile_km: float = NCALM_TERRASCAN["tile_km"]
+    # Tiling is a memory device, not a method parameter. The source works in
+    # 1 km tiles because a whole transect will not fit in RAM on modest
+    # hardware; the output does not depend on it, and the G-LiHT reprocessing
+    # did not use it. None means process the whole extent.
+    #
+    # krige_grid now chunks its neighbour query internally, so interpolation is
+    # bounded regardless of grid size. Classification is the remaining reason to
+    # tile: PDAL's SMRF and CSF hold the cloud and their own working grids in
+    # memory, so a very large cloud on a small machine may still need it. Set
+    # tile_km to 1.0 for the source's behaviour.
+    tile_km: float = None
     buffer_m: float = NCALM_TERRASCAN["buffer_m"]
+    chunk_cells: int = 1000000           # cells per neighbour query batch
 
     # noise removal, before classification
     #

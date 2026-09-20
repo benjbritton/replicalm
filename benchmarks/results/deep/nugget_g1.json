@@ -1,0 +1,30 @@
+[
+ {
+  "tag": "nug000",
+  "nugget": 0.0,
+  "freckles": 5898,
+  "clusters": 2785,
+  "anomaly_ratio": 1.4826755434275898
+ },
+ {
+  "tag": "nug005",
+  "nugget": 0.05,
+  "freckles": 3309,
+  "clusters": 1723,
+  "anomaly_ratio": 1.3340924606228413
+ },
+ {
+  "tag": "nug010",
+  "nugget": 0.1,
+  "freckles": 3346,
+  "clusters": 1815,
+  "anomaly_ratio": 1.2653300000364813
+ },
+ {
+  "tag": "nug020",
+  "nugget": 0.2,
+  "freckles": 5684,
+  "clusters": 2770,
+  "anomaly_ratio": 1.1001797267189262
+ }
+]

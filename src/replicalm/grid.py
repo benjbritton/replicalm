@@ -87,6 +87,49 @@ class Grid:
         return (abs(dx - round(dx)) < tol) and (abs(dy - round(dy)) < tol)
 
 
+def cell_for_density(density, factor=1.0, floor=0.10, ceiling=2.0):
+    """A cell size matched to how far apart the ground returns actually are.
+
+    WHY NOT A FIXED NUMBER
+    ----------------------
+    The source method produces 0.5 m and 1 m products, reasonable for the
+    surveys it was built on. They are not properties of the method. A cloud at
+    one return per square meter cannot support a 0.5 m raster, and one at
+    sixteen is wasted on it.
+
+    WHERE THE RULE COMES FROM
+    -------------------------
+    Rasterised block cross-validation on the Pixoyal window of South_GLAS_l0s395
+    at 4.74 ground returns per square meter, a mean spacing of 0.46 m. Residual
+    between the raster and returns that did not build it:
+
+        cell    median    marginal gain    cost vs 0.50 m
+        1.00 m  0.0865          --              0.25x
+        0.50 m  0.0803       -7.2%              1.0x
+        0.33 m  0.0787       -2.0%              2.3x
+        0.25 m  0.0781       -0.8%              3.9x
+
+    The curve turns at 0.5 m, which is the mean point spacing. Finer grids keep
+    improving, by fractions of a per cent for several times the compute and
+    storage.
+
+    So the cell tracks 1/sqrt(density). A `factor` below 1 oversamples
+    deliberately, buying smoother slope and sky-view-factor rendering rather
+    than accuracy -- about 2% on that window at 0.7.
+
+    CAVEAT
+    ------
+    The knee was located at one density on one window. That it sits at the mean
+    spacing is a physically sensible place for it to sit, and it is one
+    measurement, not a law. On a survey of markedly different density, measure
+    before trusting it.
+    """
+    d = float(density)
+    if not (d > 0) or d != d or d == float("inf"):
+        return float(ceiling)
+    return float(min(max(factor / math.sqrt(d), floor), ceiling))
+
+
 def snap_outward(minx, miny, maxx, maxy, cell):
     """Expand a bounding box to the next whole multiple of the cell size.
 

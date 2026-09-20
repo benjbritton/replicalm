@@ -46,7 +46,8 @@ def _noop(stage, message, fraction=None):
 
 
 def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
-            rvt_script=None, progress=None, keep_ground=True):
+            rvt_script=None, progress=None, keep_ground=True,
+            derive_cell=True):
     """Process one tile. Returns a dict describing everything written.
 
     `progress(stage, message, fraction)` is called as work proceeds, so a GUI
@@ -57,7 +58,10 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
 
     progress = progress or _noop
     cfg = cfg or PRESETS["ncalm"]
-    cell_m = cell_m or cfg.dem_cell_m
+    # None means derive it from measured density; cfg.dem_cell_m is the
+    # source's fixed figure and is used only if explicitly asked for.
+    if cell_m is None and getattr(cfg, "dem_cell_m", None) and derive_cell is False:
+        cell_m = cfg.dem_cell_m
     os.makedirs(out_dir, exist_ok=True)
     stem = os.path.splitext(os.path.basename(str(las_path)))[0]
     t0 = time.time()
@@ -84,6 +88,17 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
             "this would not be meaningful." % (len(gnd), cfg.min_ground_points))
     x = gnd["X"].astype("f8"); y = gnd["Y"].astype("f8"); z = gnd["Z"].astype("f8")
 
+    # A cell size can be given, or derived from the density actually measured.
+    # 1/sqrt(density) is where rasterised block cross-validation found the
+    # residual curve turning on the Pixoyal window; see grid.cell_for_density.
+    probe = G.grid_for_las(las_path, cell=1.0)
+    probe_area = ((probe.bounds[2] - probe.bounds[0]) *
+                  (probe.bounds[3] - probe.bounds[1]))
+    density = len(z) / probe_area if probe_area > 0 else 0.0
+    if cell_m is None:
+        cell_m = G.cell_for_density(density)
+        progress("interpolate", "cell size %.2f m derived from %.2f returns "
+                                "per m2" % (cell_m, density))
     g = G.grid_for_las(las_path, cell=cell_m)
     area = (g.bounds[2] - g.bounds[0]) * (g.bounds[3] - g.bounds[1])
     density = len(z) / area if area > 0 else 0.0
@@ -102,7 +117,8 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     dem, info = K.krige_grid(x, y, z, g, radius=radius,
                              max_points=cfg.max_points,
                              min_points=cfg.min_points, variogram=v,
-                             verbose=False)
+                             verbose=False,
+                             chunk_cells=getattr(cfg, "chunk_cells", 1000000))
     if info["fallback_fraction"] > 0.25:
         progress("interpolate",
                  "%.0f%% of cells fell back to inverse distance: the "
