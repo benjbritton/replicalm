@@ -1,6 +1,6 @@
 {
- "las": "C:\\Replicalm\\tests\\clips\\l0s395_clip.las",
- "reference": "C:\\Replicalm\\tests\\clips\\l0s395_reference.tif",
+ "las": "${WORK}\\clips\\l0s395_clip.las",
+ "reference": "${WORK}\\clips\\l0s395_reference.tif",
  "cell_m": 0.5,
  "radius_m": 20.0,
  "max_points": 32,

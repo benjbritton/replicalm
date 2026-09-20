@@ -37,7 +37,10 @@ five times, the deployment gains a default it does not currently have.
 """
 import json, os, sys, time
 from dataclasses import replace
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from replicalm import calibrate, classify, grid as G, kriging as K, interpolate
 from replicalm.config import PRESETS, GroundPass
@@ -45,8 +48,8 @@ from replicalm.config import PRESETS, GroundPass
 # argv lets the hyper-dense supplementary run take the identical code path
 # rather than a copy of it, so a difference in its results cannot be a
 # difference in the script.
-CLIPS = sys.argv[1] if len(sys.argv) > 1 else r"C:\Replicalm\tests\pilot_clips"
-OUT = sys.argv[2] if len(sys.argv) > 2 else r"C:\Replicalm\tests\pilot"
+CLIPS = sys.argv[1] if len(sys.argv) > 1 else TESTS + r"\\pilot_clips"
+OUT = sys.argv[2] if len(sys.argv) > 2 else TESTS + r"\\pilot"
 os.makedirs(OUT, exist_ok=True)
 with open(os.path.join(CLIPS, "index.json"), encoding="utf-8") as fh:
     clips = json.load(fh)

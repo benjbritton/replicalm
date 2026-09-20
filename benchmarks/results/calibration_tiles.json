@@ -5,22 +5,22 @@
   {
    "region": "Yuc_Centro",
    "tile": "l8s431",
-   "las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\AMIGACarb_Yuc_Centro_NFI_Apr2013_l8s431.las",
-   "reference_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\Centro_NFI_l8s431_DEM_0p5m_v1.tif",
+   "las": "${LAS_ROOT}\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\AMIGACarb_Yuc_Centro_NFI_Apr2013_l8s431.las",
+   "reference_dem": "${DEM_ROOT}\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\Centro_NFI_l8s431_DEM_0p5m_v1.tif",
    "chosen": "random draw, seed 20260919"
   },
   {
    "region": "Yuc_Centro",
    "tile": "l0s444",
-   "las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s444.las",
-   "reference_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s444_DEM_0p5m_v1.tif",
+   "las": "${LAS_ROOT}\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s444.las",
+   "reference_dem": "${DEM_ROOT}\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s444_DEM_0p5m_v1.tif",
    "chosen": "random draw, seed 20260919"
   },
   {
    "region": "Yuc_South",
    "tile": "l0s395",
-   "las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_Glas\\South_Glas\\AMIGACarb_Yuc_South_GLAS_Apr2013_l0s395.las",
-   "reference_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_Glas\\South_Glas\\South_GLAS_l0s395_DEM_0p5m_v1.tif",
+   "las": "${LAS_ROOT}\\Yuc_South\\South_Glas\\South_Glas\\AMIGACarb_Yuc_South_GLAS_Apr2013_l0s395.las",
+   "reference_dem": "${DEM_ROOT}\\Yuc_South\\South_Glas\\South_Glas\\South_GLAS_l0s395_DEM_0p5m_v1.tif",
    "chosen": "named: known structures, used for visual review"
   }
  ]

@@ -5,12 +5,15 @@ checked here rather than asserted, and it is the property CloudCompare could
 not provide.
 """
 import json, sys, time
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from replicalm import grid as G, kriging as K, classify, interpolate
 
-LAS = r"C:\Replicalm\tests\out\l2s505_ground.las"
-OUT = r"C:\Replicalm\tests\out\l2s505_dem_krige.tif"
+LAS = TESTS + r"\\out\l2s505_ground.las"
+OUT = TESTS + r"\\out\l2s505_dem_krige.tif"
 
 g = G.grid_for_las(LAS, cell=1.0)
 print("declared grid:", g.describe())

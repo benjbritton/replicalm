@@ -44,18 +44,21 @@ broader default, smrf at a 0.25 m threshold, lost here.
 """
 import json, os, sys, time
 from dataclasses import replace
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from replicalm import classify, clip, grid as G, kriging as K, interpolate
 from replicalm.config import PRESETS, GroundPass
 
 TILE = "l0s395"
-LAS = (r"D:\GLiHT_LAS_orig\Yuc_South\South_Glas\South_Glas"
+LAS = (LAS_ROOT + r"\\Yuc_South\South_Glas\South_Glas"
        r"\AMIGACarb_Yuc_South_GLAS_Apr2013_l0s395.las")
-REF = (r"D:\_Archive_EdgeFixed\Yuc_South\South_Glas\South_Glas"
+REF = (DEM_ROOT + r"\\Yuc_South\South_Glas\South_Glas"
        r"\South_GLAS_l0s395_DEM_0p5m_v1.tif")
 SUFFIX = sys.argv[2] if len(sys.argv) > 2 else ""
-OUT = r"C:\Replicalm\render" + SUFFIX
+OUT = ROOT + r"\\render" + SUFFIX
 WORK = os.path.join(OUT, "work")
 # the published G1s live under <root>\<Region>\<Sub>\<Sub>\, and GLiHT_rvt.py
 # mirrors whatever structure it finds, so the DEM is written into the same shape

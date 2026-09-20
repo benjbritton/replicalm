@@ -26,13 +26,16 @@ fallback does not spike, the rule's trigger is wrong and that is worth more than
 a confirmation.
 """
 import json, os, sys, time
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 from replicalm import clip
 
 WANT = ["l0s435", "l1s400"]
-OUT = r"C:\Replicalm\tests\dense_clips"
+OUT = TESTS + r"\\dense_clips"
 
-with open(r"C:\Replicalm\tests\pool_traits.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\pool_traits.json", encoding="utf-8") as fh:
     pool = json.load(fh)
 by = {r["tile"]: r for r in pool}
 

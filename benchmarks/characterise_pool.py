@@ -26,9 +26,9 @@ TRAITS AND WHAT THEY STAND IN FOR
 import glob, json, os, re, struct, sys
 import numpy as np
 
-DEM_ROOT = r"D:\_Archive_EdgeFixed"
-LAS_ROOT = r"D:\GLiHT_LAS_orig"
-OUT = r"C:\Replicalm\tests\pool_traits.json"
+DEM_ROOT = DEM_ROOT + ""
+LAS_ROOT = LAS_ROOT + ""
+OUT = TESTS + r"\\pool_traits.json"
 COARSE = 300          # cells per side for the slope read
 
 

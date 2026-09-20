@@ -9,9 +9,9 @@ import glob, json, os, random, re
 
 SEED = 20260919
 USED = {"l8s431", "l0s444", "l0s395"}
-DEM_ROOT = r"D:\_Archive_EdgeFixed"
-LAS_ROOT = r"D:\GLiHT_LAS_orig"
-OUT = r"C:\Replicalm\tests\pilot_tiles.json"
+DEM_ROOT = DEM_ROOT + ""
+LAS_ROOT = LAS_ROOT + ""
+OUT = TESTS + r"\\pilot_tiles.json"
 
 
 def tile_key(name):

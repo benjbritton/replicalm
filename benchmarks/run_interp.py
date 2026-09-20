@@ -6,11 +6,14 @@ changes nothing.
 """
 import json, sys, time
 from dataclasses import replace
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 from replicalm import calibrate
 from replicalm.config import PRESETS
 
-with open(r"C:\Replicalm\tests\clips\index.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\clips\index.json", encoding="utf-8") as fh:
     clips = {c["tile"]: c for c in json.load(fh)}
 c = clips["l0s395"]
 
@@ -24,7 +27,7 @@ t0 = time.time()
 res = calibrate.sweep_interpolation(
     las_path=c["clipped_las"],
     reference_dem=c["clipped_reference"],
-    out_dir=r"C:\Replicalm\tests\sweep_interp",
+    out_dir=TESTS + r"\\sweep_interp",
     cfg=cfg,
     radii=(5.0, 10.0, 20.0),
     max_points=(8, 16, 32, 64))

@@ -43,27 +43,30 @@ comparison across max_lag is like for like; the absolute semivariances are
 unaffected by subsampling, only the pair counts are.
 """
 import glob, json, os, sys
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from replicalm import classify, kriging as K
 
 SUBSAMPLE = 20000
 SEED = 20260919
 LAGS = [5.0, 10.0, 20.0, 40.0, 60.0, 80.0]
-OUT = r"C:\Replicalm\tests\refit_range.json"
+OUT = TESTS + r"\\refit_range.json"
 
 # the ground files the sweeps already wrote, calibration and pilot alike
 SOURCES = [
-    ("l8s431", "calibration", r"C:\Replicalm\tests\thin_val_l8s431\l8s431_ground.las"),
-    ("l0s395", "calibration", r"C:\Replicalm\tests\thin_val_l0s395\l0s395_ground.las"),
-    ("l0s444", "calibration", r"C:\Replicalm\tests\thin\ground.las"),
+    ("l8s431", "calibration", TESTS + r"\\thin_val_l8s431\l8s431_ground.las"),
+    ("l0s395", "calibration", TESTS + r"\\thin_val_l0s395\l0s395_ground.las"),
+    ("l0s444", "calibration", TESTS + r"\\thin\ground.las"),
 ]
-for p in sorted(glob.glob(r"C:\Replicalm\tests\pilot\*_ground.las")):
+for p in sorted(glob.glob(TESTS + r"\\pilot\*_ground.las")):
     b = os.path.basename(p)
     tile = b.split("_")[0]
     cls = b[len(tile) + 1:-len("_ground.las")]
     SOURCES.append((tile, "pilot/" + cls, p))
-for p in sorted(glob.glob(r"C:\Replicalm\tests\dense\*_ground.las")):
+for p in sorted(glob.glob(TESTS + r"\\dense\*_ground.las")):
     b = os.path.basename(p)
     tile = b.split("_")[0]
     cls = b[len(tile) + 1:-len("_ground.las")]

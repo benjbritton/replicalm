@@ -6,13 +6,16 @@ clips land in their own directory and their own index: mixing them with the
 calibration clips would make it possible to score a tuning tile by accident.
 """
 import json, sys, time
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 from replicalm import clip
 
-with open(r"C:\Replicalm\tests\pilot_tiles.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\pilot_tiles.json", encoding="utf-8") as fh:
     sel = json.load(fh)
 
-OUT = r"C:\Replicalm\tests\pilot_clips"
+OUT = TESTS + r"\\pilot_clips"
 recs = []
 for t in sel["tiles"]:
     t0 = time.time()

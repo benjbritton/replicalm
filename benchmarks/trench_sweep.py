@@ -32,18 +32,21 @@ identically.
 """
 import json, os, sys, time
 from dataclasses import replace
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from osgeo import gdal
 from replicalm import classify, clip, grid as G, kriging as K, interpolate
 from replicalm.config import PRESETS, GroundPass
 gdal.UseExceptions()
 
-LAS = (r"D:\GLiHT_LAS_orig\Yuc_South\South_Glas\South_Glas"
+LAS = (LAS_ROOT + r"\\Yuc_South\South_Glas\South_Glas"
        r"\AMIGACarb_Yuc_South_GLAS_Apr2013_l0s395.las")
-REF = (r"D:\_Archive_EdgeFixed\Yuc_South\South_Glas\South_Glas"
+REF = (DEM_ROOT + r"\\Yuc_South\South_Glas\South_Glas"
        r"\South_GLAS_l0s395_DEM_0p5m_v1.tif")
-OUT = r"C:\Replicalm\render_smrf\trench"
+OUT = ROOT + r"\\render_smrf\trench"
 os.makedirs(OUT, exist_ok=True)
 X0, Y0, N = 1500, 5250, 500        # the worst window, 3.48% of cells over 0.5 m
 RADIUS = 5.0

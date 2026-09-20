@@ -21,15 +21,15 @@ import numpy as np
 from osgeo import gdal
 gdal.UseExceptions()
 
-CAND = (r"C:\Replicalm\render\rvt\Yuc_South\South_Glas\South_Glas"
+CAND = (ROOT + r"\\render\rvt\Yuc_South\South_Glas\South_Glas"
         r"\South_GLAS_l0s395_G1_0p5m_v1.tif")
-ARCH = (r"D:\_Archive_EdgeFixed\Yuc_South\South_Glas\South_Glas"
+ARCH = (DEM_ROOT + r"\\Yuc_South\South_Glas\South_Glas"
         r"\South_GLAS_l0s395_G1_0p5m_v1.tif")
-CDEM = (r"C:\Replicalm\render\dem\Yuc_South\South_Glas\South_Glas"
+CDEM = (ROOT + r"\\render\dem\Yuc_South\South_Glas\South_Glas"
         r"\South_GLAS_l0s395_DEM_0p5m_v1.tif")
-RDEM = (r"D:\_Archive_EdgeFixed\Yuc_South\South_Glas\South_Glas"
+RDEM = (DEM_ROOT + r"\\Yuc_South\South_Glas\South_Glas"
         r"\South_GLAS_l0s395_DEM_0p5m_v1.tif")
-OUT = r"C:\Replicalm\render\compare"
+OUT = ROOT + r"\\render\compare"
 os.makedirs(OUT, exist_ok=True)
 CROP = 700              # detail crop size in cells, 350 m at 0.5 m
 BLOCK_ROWS = 2000       # where the driver's block boundaries fall

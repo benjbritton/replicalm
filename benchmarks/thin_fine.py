@@ -13,14 +13,17 @@ is what is being tested, not assumed.
 """
 import json, os, sys, time
 from dataclasses import replace
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from replicalm import calibrate, classify, grid as G, kriging as K, residual, interpolate
 from replicalm.config import PRESETS, GroundPass
 
-OUT = r"C:\Replicalm\tests\thin_fine"
+OUT = TESTS + r"\\thin_fine"
 os.makedirs(OUT, exist_ok=True)
-with open(r"C:\Replicalm\tests\clips\index.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\clips\index.json", encoding="utf-8") as fh:
     clips = {c["tile"]: c for c in json.load(fh)}
 c = clips["l0s444"]
 g = G.grid_from_raster(c["clipped_reference"])
@@ -31,7 +34,7 @@ cfg = replace(PRESETS["ncalm"],
               passes=[GroundPass(algorithm="smrf", slope=0.05,
                                  threshold_m=0.25)],
               remove_low_noise=False, remove_outliers=False)
-gnd_path = os.path.join(r"C:\Replicalm\tests\thin", "ground.las")
+gnd_path = os.path.join(TESTS + r"\\thin", "ground.las")
 if not os.path.exists(gnd_path):
     classify.classify_tile(c["clipped_las"], gnd_path, cfg, verbose=False)
 arr, _ = classify.read_points(gnd_path)

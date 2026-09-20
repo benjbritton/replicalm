@@ -1,12 +1,15 @@
 r"""Cut a 400 m window from each calibration tile, cloud and reference alike."""
 import json, sys, time
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 from replicalm import clip
 
-with open(r"C:\Replicalm\tests\calibration_tiles.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\calibration_tiles.json", encoding="utf-8") as fh:
     sel = json.load(fh)
 
-OUT = r"C:\Replicalm\tests\clips"
+OUT = TESTS + r"\\clips"
 recs = []
 for t in sel["tiles"]:
     t0 = time.time()
@@ -18,6 +21,6 @@ for t in sel["tiles"]:
     except Exception as e:
         print("  FAILED %s: %s\n" % (t["tile"], e))
 
-with open(r"C:\Replicalm\tests\clips\index.json", "w", encoding="utf-8") as fh:
+with open(TESTS + r"\\clips\index.json", "w", encoding="utf-8") as fh:
     json.dump(recs, fh, indent=1)
 print("prepared %d of %d tiles" % (len(recs), len(sel["tiles"])))

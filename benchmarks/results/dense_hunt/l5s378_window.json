@@ -10,9 +10,9 @@
   "coverage": 0.8390734375,
   "window_m": 399.97165633303644
  },
- "source_las": "D:\\GLiHT_LAS_orig\\Yuc_North2\\North2_NFI\\North2_NFI\\AMIGACarb_Yuc_North_2_NFI_Apr2013_l5s378.las",
- "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_North2\\North2_NFI\\North2_NFI\\North2_NFI_l5s378_DEM_0p5m_v1.tif",
- "clipped_las": "C:\\Replicalm\\tests\\dense_hunt\\l5s378_clip.las",
- "clipped_reference": "C:\\Replicalm\\tests\\dense_hunt\\l5s378_reference.tif",
+ "source_las": "${LAS_ROOT}\\Yuc_North2\\North2_NFI\\North2_NFI\\AMIGACarb_Yuc_North_2_NFI_Apr2013_l5s378.las",
+ "source_dem": "${DEM_ROOT}\\Yuc_North2\\North2_NFI\\North2_NFI\\North2_NFI_l5s378_DEM_0p5m_v1.tif",
+ "clipped_las": "${WORK}\\dense_hunt\\l5s378_clip.las",
+ "clipped_reference": "${WORK}\\dense_hunt\\l5s378_reference.tif",
  "points": 1707547
 }

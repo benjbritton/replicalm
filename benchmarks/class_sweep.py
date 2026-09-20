@@ -10,14 +10,17 @@ tile and is not the quantity in question.
 """
 import json, os, sys, time
 from dataclasses import replace
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from replicalm import calibrate, classify, grid as G, kriging as K, interpolate
 from replicalm.config import PRESETS, GroundPass
 
-OUT = r"C:\Replicalm\tests\class_sweep"
+OUT = TESTS + r"\\class_sweep"
 os.makedirs(OUT, exist_ok=True)
-with open(r"C:\Replicalm\tests\clips\index.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\clips\index.json", encoding="utf-8") as fh:
     clips = {c["tile"]: c for c in json.load(fh)}
 
 # progressively stricter ground extraction

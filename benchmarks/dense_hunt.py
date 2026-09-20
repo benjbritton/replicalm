@@ -29,7 +29,10 @@ ceiling rule. If nothing in the pool reaches it, that is the finding: l0s444 is
 an outlier and the rule guards a case that occurs once in 453 tiles.
 """
 import json, os, sys, time
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 from dataclasses import replace
 from replicalm import clip, classify
 from replicalm.config import PRESETS, GroundPass
@@ -39,10 +42,10 @@ N_CLASSIFY = 4       # of those, how many to classify
 TARGET = 8.54        # l0s444's ground density, the condition being sought
 ALREADY = {"l8s431", "l0s444", "l0s395", "l4s478", "l0s417", "l2s444",
            "l0s419", "l2s443", "l0s435", "l1s400"}
-OUT = r"C:\Replicalm\tests\dense_hunt"
+OUT = TESTS + r"\\dense_hunt"
 os.makedirs(OUT, exist_ok=True)
 
-with open(r"C:\Replicalm\tests\pool_traits.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\pool_traits.json", encoding="utf-8") as fh:
     pool = json.load(fh)
 cands = [r for r in pool if r["tile"] not in ALREADY]
 cands.sort(key=lambda r: -r["density"])
@@ -106,7 +109,7 @@ if best and best["ground_density"] >= 6.0:
     print("%s reaches %.2f ground pts/m2: dense enough to exercise the ceiling."
           % (best["tile"], best["ground_density"]))
     print("run: pilot_sweep.py %s %s"
-          % (OUT, r"C:\Replicalm\tests\dense2"))
+          % (OUT, TESTS + r"\\dense2"))
 elif best:
     print("best found is %s at %.2f ground pts/m2, against l0s444's %.2f."
           % (best["tile"], best["ground_density"], TARGET))

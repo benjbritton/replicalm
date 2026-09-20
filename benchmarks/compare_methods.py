@@ -7,14 +7,17 @@ tiles, against the same references, with the same classification.
 """
 import json, os, sys, time
 from dataclasses import replace
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from replicalm import calibrate, classify, grid as G, kriging as K, universal as U, interpolate
 from replicalm.config import PRESETS
 
-OUT = r"C:\Replicalm\tests\methods"
+OUT = TESTS + r"\\methods"
 os.makedirs(OUT, exist_ok=True)
-with open(r"C:\Replicalm\tests\clips\index.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\clips\index.json", encoding="utf-8") as fh:
     clips = json.load(fh)
 
 base = PRESETS["ncalm"]
@@ -39,7 +42,7 @@ for c in clips:
     tile = c["tile"]
     g = G.grid_from_raster(c["clipped_reference"])
     wkt = interpolate.source_srs(c["clipped_las"])
-    gnd_path = os.path.join(r"C:\Replicalm\tests\three_tiles", "%s_ground.las" % tile)
+    gnd_path = os.path.join(TESTS + r"\\three_tiles", "%s_ground.las" % tile)
     if not os.path.exists(gnd_path):
         classify.classify_tile(c["clipped_las"], gnd_path, cfg, verbose=False)
     arr, _ = classify.read_points(gnd_path)

@@ -1,16 +1,19 @@
 ﻿r"""First run of the classifier on a real tile, to prove the plumbing.
 
-Uses the LAS sitting in C:\g1 rather than synthetic data, because the thing
+Uses a real LAS rather than synthetic data, because the thing
 most likely to be wrong is an assumption about the file, not the algorithm.
 """
 import os, sys, time
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 
 from replicalm.config import PRESETS
 from replicalm import classify
 
-SRC = r"D:\GLiHT_LAS_orig\Yuc_Campeche\Campeche\AMIGACarb_Chiap_Campeche_NFI_Apr2013_l2s505.las"
-OUT = r"C:\Replicalm\tests\out"
+SRC = LAS_ROOT + r"\\Yuc_Campeche\Campeche\AMIGACarb_Chiap_Campeche_NFI_Apr2013_l2s505.las"
+OUT = TESTS + r"\\out"
 os.makedirs(OUT, exist_ok=True)
 
 print("source: %s  (%.1f MB)" % (os.path.basename(SRC),

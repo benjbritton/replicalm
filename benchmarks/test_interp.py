@@ -1,10 +1,13 @@
 r"""Rasterise the classified tile and confirm the result is a real GeoTIFF."""
 import os, sys
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 from replicalm import interpolate
 
-LAS = r"C:\Replicalm\tests\out\l2s505_ground.las"
-OUT = r"C:\Replicalm\tests\out\l2s505_dem.tif"
+LAS = TESTS + r"\\out\l2s505_ground.las"
+OUT = TESTS + r"\\out\l2s505_dem.tif"
 
 print("source CRS from LAS header:")
 wkt = interpolate.source_srs(LAS)

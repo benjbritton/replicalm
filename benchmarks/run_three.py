@@ -5,17 +5,20 @@ deriving the radius matters, or whether one fixed value would have done.
 """
 import json, os, sys, time
 from dataclasses import replace
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 from replicalm import calibrate, classify, grid as G, kriging as K, interpolate
 from replicalm.config import PRESETS
 
-with open(r"C:\Replicalm\tests\clips\index.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\clips\index.json", encoding="utf-8") as fh:
     clips = json.load(fh)
 
 base = PRESETS["ncalm"]
 cfg = replace(base, passes=[replace(p, slope=0.10, threshold_m=1.0)
                             for p in base.passes])
-OUT = r"C:\Replicalm\tests\three_tiles"
+OUT = TESTS + r"\\three_tiles"
 os.makedirs(OUT, exist_ok=True)
 
 print("%-8s %10s %8s %8s %9s %8s %9s %9s %8s"

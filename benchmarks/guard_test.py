@@ -39,17 +39,20 @@ Scored against the archive DEM, overall and by slope band, on the window the
 artifact was spotted in.
 """
 import json, os, sys
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from scipy.spatial import cKDTree
 from replicalm import classify, grid as G, kriging as K, interpolate
 
-GND = r"C:\Replicalm\render\work\l0s395_02000_00000_gnd.las"
-REF = (r"D:\_Archive_EdgeFixed\Yuc_South\South_Glas\South_Glas"
+GND = ROOT + r"\\render\work\l0s395_02000_00000_gnd.las"
+REF = (DEM_ROOT + r"\\Yuc_South\South_Glas\South_Glas"
        r"\South_GLAS_l0s395_DEM_0p5m_v1.tif")
-LAS = (r"D:\GLiHT_LAS_orig\Yuc_South\South_Glas\South_Glas"
+LAS = (LAS_ROOT + r"\\Yuc_South\South_Glas\South_Glas"
        r"\AMIGACarb_Yuc_South_GLAS_Apr2013_l0s395.las")
-OUT = r"C:\Replicalm\render\guard"
+OUT = ROOT + r"\\render\guard"
 os.makedirs(OUT, exist_ok=True)
 X0, Y0, NW, NH = 2100, 0, 700, 700       # the detail2 window
 RADIUS, MAXP, MINP = 14.4, 16, 3

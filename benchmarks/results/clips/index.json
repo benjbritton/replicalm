@@ -11,10 +11,10 @@
    "coverage": 0.94850625,
    "window_m": 400.0046264168391
   },
-  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\AMIGACarb_Yuc_Centro_NFI_Apr2013_l8s431.las",
-  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\Centro_NFI_l8s431_DEM_0p5m_v1.tif",
-  "clipped_las": "C:\\Replicalm\\tests\\clips\\l8s431_clip.las",
-  "clipped_reference": "C:\\Replicalm\\tests\\clips\\l8s431_reference.tif",
+  "source_las": "${LAS_ROOT}\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\AMIGACarb_Yuc_Centro_NFI_Apr2013_l8s431.las",
+  "source_dem": "${DEM_ROOT}\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\Centro_NFI_l8s431_DEM_0p5m_v1.tif",
+  "clipped_las": "${WORK}\\clips\\l8s431_clip.las",
+  "clipped_reference": "${WORK}\\clips\\l8s431_reference.tif",
   "points": 1160361,
   "seconds": 12.3
  },
@@ -30,10 +30,10 @@
    "coverage": 0.8669484375,
    "window_m": 400.0286123033004
   },
-  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s444.las",
-  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s444_DEM_0p5m_v1.tif",
-  "clipped_las": "C:\\Replicalm\\tests\\clips\\l0s444_clip.las",
-  "clipped_reference": "C:\\Replicalm\\tests\\clips\\l0s444_reference.tif",
+  "source_las": "${LAS_ROOT}\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s444.las",
+  "source_dem": "${DEM_ROOT}\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s444_DEM_0p5m_v1.tif",
+  "clipped_las": "${WORK}\\clips\\l0s444_clip.las",
+  "clipped_reference": "${WORK}\\clips\\l0s444_reference.tif",
   "points": 4228475,
   "seconds": 28.6
  },
@@ -49,10 +49,10 @@
    "coverage": 0.9794203125,
    "window_m": 400.0332294911721
   },
-  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_Glas\\South_Glas\\AMIGACarb_Yuc_South_GLAS_Apr2013_l0s395.las",
-  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_Glas\\South_Glas\\South_GLAS_l0s395_DEM_0p5m_v1.tif",
-  "clipped_las": "C:\\Replicalm\\tests\\clips\\l0s395_clip.las",
-  "clipped_reference": "C:\\Replicalm\\tests\\clips\\l0s395_reference.tif",
+  "source_las": "${LAS_ROOT}\\Yuc_South\\South_Glas\\South_Glas\\AMIGACarb_Yuc_South_GLAS_Apr2013_l0s395.las",
+  "source_dem": "${DEM_ROOT}\\Yuc_South\\South_Glas\\South_Glas\\South_GLAS_l0s395_DEM_0p5m_v1.tif",
+  "clipped_las": "${WORK}\\clips\\l0s395_clip.las",
+  "clipped_reference": "${WORK}\\clips\\l0s395_reference.tif",
   "points": 949707,
   "seconds": 12.4
  }

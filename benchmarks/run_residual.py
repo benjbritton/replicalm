@@ -1,13 +1,16 @@
 r"""Diagnose the residuals already on disk: noise, or their smoothing?"""
 import glob, json, os, sys, time
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from replicalm import residual
 
-with open(r"C:\Replicalm\tests\clips\index.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\clips\index.json", encoding="utf-8") as fh:
     clips = {c["tile"]: c for c in json.load(fh)}
 
-M = r"C:\Replicalm\tests\methods"
+M = TESTS + r"\\methods"
 print("%-8s %-9s %8s %8s %8s %9s %8s  %s"
       % ("tile", "method", "resid sd", "nugget", "sill", "nug/sill",
          "range m", "Moran I"))

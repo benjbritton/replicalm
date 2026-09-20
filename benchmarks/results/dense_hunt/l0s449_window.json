@@ -10,9 +10,9 @@
   "coverage": 0.84955,
   "window_m": 400.03635092625086
  },
- "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s449.las",
- "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s449_DEM_0p5m_v1.tif",
- "clipped_las": "C:\\Replicalm\\tests\\dense_hunt\\l0s449_clip.las",
- "clipped_reference": "C:\\Replicalm\\tests\\dense_hunt\\l0s449_reference.tif",
+ "source_las": "${LAS_ROOT}\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s449.las",
+ "source_dem": "${DEM_ROOT}\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s449_DEM_0p5m_v1.tif",
+ "clipped_las": "${WORK}\\dense_hunt\\l0s449_clip.las",
+ "clipped_reference": "${WORK}\\dense_hunt\\l0s449_reference.tif",
  "points": 3478250
 }

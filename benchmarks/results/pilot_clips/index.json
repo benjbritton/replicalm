@@ -11,10 +11,10 @@
    "coverage": 0.93585,
    "window_m": 400.043348104389
   },
-  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l4s478.las",
-  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l4s478_DEM_0p5m_v1.tif",
-  "clipped_las": "C:\\Replicalm\\tests\\pilot_clips\\l4s478_clip.las",
-  "clipped_reference": "C:\\Replicalm\\tests\\pilot_clips\\l4s478_reference.tif",
+  "source_las": "${LAS_ROOT}\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l4s478.las",
+  "source_dem": "${DEM_ROOT}\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l4s478_DEM_0p5m_v1.tif",
+  "clipped_las": "${WORK}\\pilot_clips\\l4s478_clip.las",
+  "clipped_reference": "${WORK}\\pilot_clips\\l4s478_reference.tif",
   "points": 1688752,
   "seconds": 4.8
  },
@@ -30,10 +30,10 @@
    "coverage": 0.784978125,
    "window_m": 400.00410557184455
   },
-  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l0s417.las",
-  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l0s417_DEM_0p5m_v1.tif",
-  "clipped_las": "C:\\Replicalm\\tests\\pilot_clips\\l0s417_clip.las",
-  "clipped_reference": "C:\\Replicalm\\tests\\pilot_clips\\l0s417_reference.tif",
+  "source_las": "${LAS_ROOT}\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l0s417.las",
+  "source_dem": "${DEM_ROOT}\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l0s417_DEM_0p5m_v1.tif",
+  "clipped_las": "${WORK}\\pilot_clips\\l0s417_clip.las",
+  "clipped_reference": "${WORK}\\pilot_clips\\l0s417_reference.tif",
   "points": 1863390,
   "seconds": 11.9
  },
@@ -49,10 +49,10 @@
    "coverage": 0.9510578125,
    "window_m": 400.00736833291376
   },
-  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l2s444.las",
-  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l2s444_DEM_0p5m_v1.tif",
-  "clipped_las": "C:\\Replicalm\\tests\\pilot_clips\\l2s444_clip.las",
-  "clipped_reference": "C:\\Replicalm\\tests\\pilot_clips\\l2s444_reference.tif",
+  "source_las": "${LAS_ROOT}\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l2s444.las",
+  "source_dem": "${DEM_ROOT}\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l2s444_DEM_0p5m_v1.tif",
+  "clipped_las": "${WORK}\\pilot_clips\\l2s444_clip.las",
+  "clipped_reference": "${WORK}\\pilot_clips\\l2s444_reference.tif",
   "points": 1552430,
   "seconds": 12.1
  },
@@ -68,10 +68,10 @@
    "coverage": 0.7336484375,
    "window_m": 400.00435433392704
   },
-  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l0s419.las",
-  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l0s419_DEM_0p5m_v1.tif",
-  "clipped_las": "C:\\Replicalm\\tests\\pilot_clips\\l0s419_clip.las",
-  "clipped_reference": "C:\\Replicalm\\tests\\pilot_clips\\l0s419_reference.tif",
+  "source_las": "${LAS_ROOT}\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l0s419.las",
+  "source_dem": "${DEM_ROOT}\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l0s419_DEM_0p5m_v1.tif",
+  "clipped_las": "${WORK}\\pilot_clips\\l0s419_clip.las",
+  "clipped_reference": "${WORK}\\pilot_clips\\l0s419_reference.tif",
   "points": 1959035,
   "seconds": 8.0
  },
@@ -87,10 +87,10 @@
    "coverage": 0.952425,
    "window_m": 399.99635452266693
   },
-  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l2s443.las",
-  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l2s443_DEM_0p5m_v1.tif",
-  "clipped_las": "C:\\Replicalm\\tests\\pilot_clips\\l2s443_clip.las",
-  "clipped_reference": "C:\\Replicalm\\tests\\pilot_clips\\l2s443_reference.tif",
+  "source_las": "${LAS_ROOT}\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l2s443.las",
+  "source_dem": "${DEM_ROOT}\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l2s443_DEM_0p5m_v1.tif",
+  "clipped_las": "${WORK}\\pilot_clips\\l2s443_clip.las",
+  "clipped_reference": "${WORK}\\pilot_clips\\l2s443_reference.tif",
   "points": 899219,
   "seconds": 9.1
  }

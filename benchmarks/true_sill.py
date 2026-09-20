@@ -12,15 +12,18 @@ all, and the honest statement is the nugget as a fraction of variance at a named
 lag.
 """
 import json, os, sys
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from osgeo import gdal
 from replicalm import residual
 gdal.UseExceptions()
 
-with open(r"C:\Replicalm\tests\clips\index.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\clips\index.json", encoding="utf-8") as fh:
     clips = {c["tile"]: c for c in json.load(fh)}
-S = r"C:\Replicalm\tests\class_sweep"
+S = TESTS + r"\\class_sweep"
 BEST = {"l0s395": "csfrigid2", "l8s431": "smrfs05t05", "l0s444": "smrfs05t025"}
 
 

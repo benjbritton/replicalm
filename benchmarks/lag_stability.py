@@ -6,11 +6,14 @@ test is simple: fit the same points at increasing lags. A real range settles; a
 truncated one keeps climbing with the window that produced it.
 """
 import json, os, sys
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from replicalm import classify, kriging as K
 
-OUT = r"C:\Replicalm\tests\three_tiles"
+OUT = TESTS + r"\\three_tiles"
 LAGS = (5.0, 10.0, 20.0, 40.0, 80.0)
 
 print("%-8s %8s" % ("tile", "lag m"), end="")

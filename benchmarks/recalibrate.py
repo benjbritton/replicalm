@@ -42,7 +42,10 @@ THE ARMS
 """
 import json, math, os, sys, time
 from dataclasses import replace
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from scipy.spatial import cKDTree
 from osgeo import gdal
@@ -50,7 +53,7 @@ from replicalm import calibrate, classify, clip, grid as G, kriging as K, interp
 from replicalm.config import PRESETS, GroundPass
 gdal.UseExceptions()
 
-OUT = r"C:\Replicalm\tests\recal"
+OUT = TESTS + r"\\recal"
 CLIPS = os.path.join(OUT, "clips")
 os.makedirs(CLIPS, exist_ok=True)
 WIN_M = 400.0
@@ -76,8 +79,8 @@ ARMS = [
     ("ncalm_asdoc", replace(PRESETS["ncalm"], passes=two_pass(cell=1.0, thr=3.0))),
 ]
 
-tiles = json.load(open(r"C:\Replicalm\tests\calibration_tiles.json"))["tiles"]
-tiles += json.load(open(r"C:\Replicalm\tests\pilot_tiles.json"))["tiles"]
+tiles = json.load(open(TESTS + r"\\calibration_tiles.json"))["tiles"]
+tiles += json.load(open(TESTS + r"\\pilot_tiles.json"))["tiles"]
 
 results = []
 for t in tiles:

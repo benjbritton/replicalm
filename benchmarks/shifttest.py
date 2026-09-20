@@ -7,12 +7,15 @@ position is safe whatever mode is used. If they differ, the mode matters and we
 must pin it.
 """
 import glob, os, subprocess, sys
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 from osgeo import gdal
 gdal.UseExceptions()
 
-CC = r"C:\Program Files\CloudCompare\CloudCompare.exe"
-LAS = r"C:\Replicalm\tests\out\l2s505_ground.las"
+from paths import CLOUDCOMPARE as CC
+LAS = TESTS + r"\\out\l2s505_ground.las"
 D = os.path.dirname(LAS)
 
 MODES = [("auto (default)", []),

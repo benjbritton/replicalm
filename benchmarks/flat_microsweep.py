@@ -37,7 +37,10 @@ its own, against both off as the baseline.
 """
 import json, os, sys, time
 from dataclasses import replace
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from osgeo import gdal
 from scipy import ndimage as ndi
@@ -46,9 +49,9 @@ from replicalm.config import PRESETS
 gdal.UseExceptions()
 
 # the coverage-selected clip: 95.2% covered, 0.02% of cells above 20 degrees
-LAS = r"C:\Replicalm\tests\pilot_clips\l2s443_clip.las"
-REF = r"C:\Replicalm\tests\pilot_clips\l2s443_reference.tif"
-OUT = r"C:\Replicalm\tests\flatsweep"
+LAS = TESTS + r"\\pilot_clips\l2s443_clip.las"
+REF = TESTS + r"\\pilot_clips\l2s443_reference.tif"
+OUT = TESTS + r"\\flatsweep"
 os.makedirs(OUT, exist_ok=True)
 
 ARMS = [

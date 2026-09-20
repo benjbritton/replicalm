@@ -9,8 +9,8 @@ import numpy as np
 from osgeo import gdal
 gdal.UseExceptions()
 
-CC = r"C:\Program Files\CloudCompare\CloudCompare.exe"
-LAS = r"C:\Replicalm\tests\out\l2s505_ground.las"
+from paths import CLOUDCOMPARE as CC
+LAS = TESTS + r"\\out\l2s505_ground.las"
 D = os.path.dirname(LAS)
 
 

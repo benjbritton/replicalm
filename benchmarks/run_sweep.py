@@ -5,11 +5,14 @@ loss of terrain complexity, against the DEM the TerraScan and Surfer pipeline
 produced for the same ground.
 """
 import json, sys, time
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 from replicalm import calibrate
 from replicalm.config import PRESETS
 
-with open(r"C:\Replicalm\tests\clips\index.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\clips\index.json", encoding="utf-8") as fh:
     clips = {c["tile"]: c for c in json.load(fh)}
 
 c = clips["l0s395"]
@@ -24,7 +27,7 @@ t0 = time.time()
 res = calibrate.sweep(
     las_path=c["clipped_las"],
     reference_dem=c["clipped_reference"],
-    out_dir=r"C:\Replicalm\tests\sweep_l0s395",
+    out_dir=TESTS + r"\\sweep_l0s395",
     base_cfg=PRESETS["ncalm"],
     param_grid=GRID,
     cell=0.5, radius=20.0, max_points=32)

@@ -6,14 +6,17 @@ noise we are introducing, the nugget-to-sill ratio should fall from 0.92.
 """
 import json, os, sys, time
 from dataclasses import replace
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from replicalm import calibrate, classify, grid as G, kriging as K, residual, interpolate
 from replicalm.config import PRESETS, GroundPass
 
-OUT = r"C:\Replicalm\tests\elm"
+OUT = TESTS + r"\\elm"
 os.makedirs(OUT, exist_ok=True)
-with open(r"C:\Replicalm\tests\clips\index.json", encoding="utf-8") as fh:
+with open(TESTS + r"\\clips\index.json", encoding="utf-8") as fh:
     clips = {c["tile"]: c for c in json.load(fh)}
 
 for tile in ("l0s444", "l0s395", "l8s431"):

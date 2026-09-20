@@ -28,7 +28,10 @@ the default should be off and the trench comparison needs re-running arm by arm.
 """
 import json, math, os, sys, time
 from dataclasses import replace
-sys.path.insert(0, r"C:\Replicalm\src")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ROOT, SRC, DEM_ROOT, LAS_ROOT, TESTS
+sys.path.insert(0, SRC)
 import numpy as np
 from scipy.spatial import cKDTree
 from osgeo import gdal
@@ -36,8 +39,8 @@ from replicalm import classify, grid as G, kriging as K, interpolate
 from replicalm.config import PRESETS, GroundPass
 gdal.UseExceptions()
 
-CLIPS = r"C:\Replicalm\tests\recal\clips"
-OUT = r"C:\Replicalm\tests\filt"
+CLIPS = TESTS + r"\\recal\clips"
+OUT = TESTS + r"\\filt"
 os.makedirs(OUT, exist_ok=True)
 TILES = ["l0s395", "l0s417", "l2s444"]      # 33.2%, 13.1%, 11.3% steep
 

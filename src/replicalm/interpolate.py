@@ -28,7 +28,13 @@ import os
 import subprocess
 import time
 
-CLOUDCOMPARE = r"C:\Program Files\CloudCompare\CloudCompare.exe"
+# CloudCompare is optional -- the pipeline does not need it and the rasterising
+# path that calls it is not the default. Where it is installed is a property of
+# the machine, not of the method, so it is read from the environment with the
+# usual Windows location as a fallback.
+CLOUDCOMPARE = os.environ.get(
+    "REPLICALM_CLOUDCOMPARE",
+    r"C:\Program Files\CloudCompare\CloudCompare.exe")
 
 
 class InterpolateError(RuntimeError):

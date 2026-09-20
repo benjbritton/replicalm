@@ -1,6 +1,6 @@
 {
- "las": "C:\\Replicalm\\tests\\clips\\l0s395_clip.las",
- "reference": "C:\\Replicalm\\tests\\clips\\l0s395_reference.tif",
+ "las": "${WORK}\\clips\\l0s395_clip.las",
+ "reference": "${WORK}\\clips\\l0s395_reference.tif",
  "ground_points": 680658,
  "complexity_reference": 0.04991233182042692,
  "ranked": [

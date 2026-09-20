@@ -11,10 +11,10 @@
    "coverage": 0.9653359375,
    "window_m": 399.99471947194786
   },
-  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Chiaps1\\Chiapas_NFI\\Chiapas_NFI\\AMIGACarb_Chiaps_1_NFI_Apr2013_l0s435.las",
-  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Chiaps1\\Chiapas_NFI\\Chiapas_NFI\\Chiaps1_NFI_l0s435_DEM_0p5m_v1.tif",
-  "clipped_las": "C:\\Replicalm\\tests\\dense_clips\\l0s435_clip.las",
-  "clipped_reference": "C:\\Replicalm\\tests\\dense_clips\\l0s435_reference.tif",
+  "source_las": "${LAS_ROOT}\\Yuc_Chiaps1\\Chiapas_NFI\\Chiapas_NFI\\AMIGACarb_Chiaps_1_NFI_Apr2013_l0s435.las",
+  "source_dem": "${DEM_ROOT}\\Yuc_Chiaps1\\Chiapas_NFI\\Chiapas_NFI\\Chiaps1_NFI_l0s435_DEM_0p5m_v1.tif",
+  "clipped_las": "${WORK}\\dense_clips\\l0s435_clip.las",
+  "clipped_reference": "${WORK}\\dense_clips\\l0s435_reference.tif",
   "points": 795339,
   "seconds": 8.1
  },
@@ -30,10 +30,10 @@
    "coverage": 0.791865625,
    "window_m": 400.0164417177629
   },
-  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_Glas\\South_Glas\\AMIGACarb_Yuc_South_GLAS_Apr2013_l1s400.las",
-  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_Glas\\South_Glas\\South_GLAS_l1s400_DEM_0p5m_v1.tif",
-  "clipped_las": "C:\\Replicalm\\tests\\dense_clips\\l1s400_clip.las",
-  "clipped_reference": "C:\\Replicalm\\tests\\dense_clips\\l1s400_reference.tif",
+  "source_las": "${LAS_ROOT}\\Yuc_South\\South_Glas\\South_Glas\\AMIGACarb_Yuc_South_GLAS_Apr2013_l1s400.las",
+  "source_dem": "${DEM_ROOT}\\Yuc_South\\South_Glas\\South_Glas\\South_GLAS_l1s400_DEM_0p5m_v1.tif",
+  "clipped_las": "${WORK}\\dense_clips\\l1s400_clip.las",
+  "clipped_reference": "${WORK}\\dense_clips\\l1s400_reference.tif",
   "points": 1889199,
   "seconds": 2.2
  }

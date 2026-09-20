@@ -10,8 +10,8 @@ import glob, json, os, random, re
 SEED = 20260919          # the date, so the draw is reproducible and unchosen
 random.seed(SEED)
 
-DEM_ROOT = r"D:\_Archive_EdgeFixed"
-LAS_ROOT = r"D:\GLiHT_LAS_orig"
+DEM_ROOT = DEM_ROOT + ""
+LAS_ROOT = LAS_ROOT + ""
 
 
 def tile_key(name):
@@ -65,7 +65,7 @@ for s in sel:
     print("           %s" % s["las"])
     print("           %s" % s["reference_dem"])
 
-os.makedirs(r"C:\Replicalm\tests", exist_ok=True)
-with open(r"C:\Replicalm\tests\calibration_tiles.json", "w", encoding="utf-8") as fh:
+os.makedirs(TESTS + "", exist_ok=True)
+with open(TESTS + r"\\calibration_tiles.json", "w", encoding="utf-8") as fh:
     json.dump({"seed": SEED, "candidates": len(pairs), "tiles": sel}, fh, indent=1)
-print("\nrecorded in C:\Replicalm\tests\calibration_tiles.json")
+print("\nrecorded in %s" % os.path.join(TESTS, "calibration_tiles.json"))
