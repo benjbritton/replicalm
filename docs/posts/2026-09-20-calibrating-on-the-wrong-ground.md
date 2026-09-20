@@ -83,12 +83,26 @@ radius   own fill    rmse    20-30deg  30-90deg   (same cells every row)
  1.50      93.1%    0.065      1.24%     3.12%
 ```
 
+![RMSE against search radius, scored two ways](../figures/fig6_fill_fraction_trap.png)
+
+*The same six runs scored two ways. Against each radius's own output the error
+falls steeply; against a cell set every radius can solve it is flat. The dotted
+line is the share of cells solved, and it is the whole explanation.*
+
 **What it actually was.** The cells that failed had a median of 74 returns
 within 1.5 m and *zero* classified as ground. The returns were there; the
-classifier was discarding them. Ground fraction fell from 45% on flat ground to
-28% above 30°, and to nil on the flanks — a rigidness-2 cloth cannot drape a
-30° mound face, so the flank returns sit further below it than the threshold
-allows and are never ground.
+classifier was discarding them.
+
+![The same returns classified by CSF and by SMRF](../figures/fig5_classifier_slice.png)
+
+*A 3 m slice through the mound group, same returns in both panels. Grey is every
+return; colour is what each filter kept as ground. CSF abandons the steep left
+flank entirely — nothing before 15 m — and breaks again at 150 m and 240 m.
+SMRF tracks the surface continuously across all of them.*
+
+Ground fraction fell from 45% on flat ground to 28% above 30°, and to nil on the
+flanks — a rigidness-2 cloth cannot drape a 30° mound face, so the flank returns
+sit further below it than the threshold allows and are never ground.
 
 ```
 arm              gnd/m2  steep support   window rmse
@@ -123,6 +137,8 @@ l0s395   97.9%    0.20%           82.0%   28.26%
 l2s444   95.1%    0.00%           90.9%   11.28%
 l2s443   95.2%    0.02%           87.2%    2.53%
 ```
+
+![Steep-cell content of calibration windows, by selection rule](../figures/fig7_window_selection.png)
 
 Every calibration window contained between 0.00% and 0.20% steep ground. The
 sweeps were not under-weighting slopes; they had none. A classifier sweep across

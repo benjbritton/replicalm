@@ -37,6 +37,13 @@ does five things:
    filter called SMRF, which works by sliding a shape across the data and asking
    which points sit close enough to the lowest surface to be ground.
 
+   ![A slice through a mound group, showing all returns and the ones kept as ground](figures/figA_cross_section.png)
+
+   *A three-metre-wide slice cut through a mound group, seen from the side. The
+   grey dots are every laser return — canopy above, ground below. The red dots
+   are the ones the filter decided were the floor. The whole job is drawing that
+   red line correctly, including where the ground is steep.*
+
 3. **Removes obvious errors.** A few returns land below the real ground —
    reflections, birds, noise in the sensor. These are flagged so they do not
    drag the surface down into a pit.
@@ -51,6 +58,13 @@ does five things:
    trimmed. Small holes inside the covered area get filled. Areas with no data
    are set to black, and nothing inside the data area is allowed to be black, so
    that a hole can never be mistaken for terrain or the other way round.
+
+   ![The edge of the surveyed area, before and after tidying](figures/figC_edges_and_holes.png)
+
+   *The eastern edge of the flight line. On the left, the raw surface: the
+   ragged comb along the boundary is cells calculated from data on one side
+   only, which can be wrong by several metres. On the right, the same area after
+   trimming.*
 
 The output is a GeoTIFF with two layers: the elevations, and a mask saying where
 the data is real. From there the existing G1 visualisation recipe produces the
@@ -139,6 +153,11 @@ recorded. The other removes a fraction of a percent and its effect varies by
 tile.
 
 ## How well it works
+
+![The original workflow and Replicalm over the same mound group](figures/figB_archive_vs_replicalm.png)
+
+*The same ground, same point cloud, same visualisation recipe. On the left, the
+surface from the original commercial workflow. On the right, Replicalm.*
 
 Tested on South_GLAS_l0s395, a tile with known structures, against the
 reference surface from the original workflow:
