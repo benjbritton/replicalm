@@ -13,7 +13,7 @@ full visual evidence at about 2.9 MB without the 3.4 GB behind it.
 
 | directory | configuration | status |
 |---|---|---|
-| `render/` | CSF rigidness 2, one pass, noise filters off, 14.4 m radius | **superseded.** The flat-calibrated configuration — the centre panel of every three-way comparison figure, and the one showing bead artifacts on mound flanks. |
+| `render/` | CSF rigidness 2, one pass, noise filters off, 14.4 m radius | **superseded.** The flat-calibrated configuration — the center panel of every three-way comparison figure, and the one showing bead artifacts on mound flanks. |
 | `render_r15/` | as above but a 1.5 m search radius | **superseded, and instructive.** Its apparent improvement was a scoring artifact: cells it could not solve were dropped rather than counted, so the steep ground left the denominator. |
 | `render_smrf/` | SMRF one pass, 5 m radius, filters off | **superseded.** The intermediate step that fixed the flanks but not the terracing. Also holds `trench/` and `flank/`, the windowed sweeps. |
 | `render_ncalm/` | the locked baseline | **current.** The accepted product: DEM, the six RVT layers including G1, and the comparison crops. |
@@ -57,7 +57,7 @@ python recalibrate.py        # the eight-tile harness on relief-selected windows
 ```
 
 Each writes its measurements as JSON. The committed copies are in
-`benchmarks/results/`, with paths tokenised so they resolve anywhere.
+`benchmarks/results/`, with paths tokenized so they resolve anywhere.
 
 ## Why not Git LFS
 

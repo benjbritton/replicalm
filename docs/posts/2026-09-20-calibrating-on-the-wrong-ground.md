@@ -9,12 +9,12 @@ Benjamin Jay Britton, 20 September 2026
 Replicalm reproduces the NCALM bare-earth workflow described in the Estrada-Belli
 et al. 2025 supplementary material using PDAL, GDAL, NumPy and SciPy, with no
 TerraScan, ArcGIS Pro, Golden Surfer or paid LAStools module. The point of the
-exercise is that the published method cannot be run without those licences, so
+exercise is that the published method cannot be run without those licenses, so
 its results cannot be reproduced or extended by anyone who lacks them.
 
 This post is about the part of that work which was not a porting exercise. The
 pipeline was tuned against reference surfaces from the original workflow, it
-scored well, and it produced a visualisation with a large and obvious artifact
+scored well, and it produced a visualization with a large and obvious artifact
 in it. The artifact was not in the parameters. It was in how the parameters had
 been chosen.
 
@@ -48,20 +48,20 @@ Rendered at tile scale, that configuration produced this:
 
 ![Archive, flat-calibrated output, and the locked baseline over a mound group](../figures/fig1_flank_artifact.png)
 
-*Left: the archive G1 from the original workflow. Centre: the flat-calibrated
+*Left: the archive G1 from the original workflow. Center: the flat-calibrated
 configuration. Right: the locked baseline. Same point cloud, same 0.5 m grid.*
 
-The beaded necklaces along the mound flanks in the centre panel are not in the
+The beaded necklaces along the mound flanks in the center panel are not in the
 data and not in the archive. They are runs of cells pinned to a local extreme
 where the interpolator could find no ground returns nearby.
 
 ## The diagnosis went wrong twice before it went right
 
 **First hypothesis: the kriging fallback guard.** `krige_grid` rejected any
-estimate falling outside the range of its neighbours, on the stated grounds that
+estimate falling outside the range of its neighbors, on the stated grounds that
 ordinary kriging interpolates and cannot legitimately extrapolate. That premise
 is false — OK weights sum to one but are not constrained positive, and a cell
-near the top of a slope should estimate above all its neighbours. The guard did
+near the top of a slope should estimate above all its neighbors. The guard did
 fire preferentially on steep ground (8.2% of cells above 30° against 0.17% on
 the flat) and diverted them to inverse distance, which *is* a convex combination
 and therefore clamps. The mechanism was right and the magnitude was not:
@@ -95,8 +95,8 @@ classifier was discarding them.
 
 ![The same returns classified by CSF and by SMRF](../figures/fig5_classifier_slice.png)
 
-*A 3 m slice through the mound group, same returns in both panels. Grey is every
-return; colour is what each filter kept as ground. CSF abandons the steep left
+*A 3 m slice through the mound group, same returns in both panels. Gray is every
+return; color is what each filter kept as ground. CSF abandons the steep left
 flank entirely — nothing before 15 m — and breaks again at 150 m and 240 m.
 SMRF tracks the surface continuously across all of them.*
 
@@ -159,7 +159,7 @@ source verbatim    6    98.3%   17.68%    2.98%   0.4416
 
 With the classifier fixed, steep faces still rendered as concentric steps.
 `filters.smrf` works on its own grid, `cell`, left at 1.0 m while the output was
-0.5 m. On a near-vertical trench wall a 1 m cell spans a metre of real
+0.5 m. On a near-vertical trench wall a 1 m cell spans a meter of real
 elevation, so the threshold admits and rejects returns in bands down the face.
 
 ![Terracing against SMRF working grid](../figures/fig4_terracing_vs_cell.png)
@@ -196,14 +196,14 @@ windows of 5 to 80 m on ten tiles, the range tracked the window every time at
 as a measurement. The baseline sets the radius from point density instead, and
 says so.
 
-**`max_points` is the real neighbourhood control, not the radius.** At 4 ground
-points per m² the 16th neighbour is within ~1.2 m, so the cap binds and 5 m and
+**`max_points` is the real neighborhood control, not the radius.** At 4 ground
+points per m² the 16th neighbor is within ~1.2 m, so the cap binds and 5 m and
 20 m radii give identical results to four decimals. The radius acts only where
 points are sparse — which is the coverage boundary, where the one-sided fringe
 is one radius wide and carried a third of the tile's error budget.
 
 **Thinning dense tiles buys provenance, not accuracy.** At 8.18 pts/m², 76% of
-cells fell back to inverse distance because the 16 nearest neighbours sit within
+cells fell back to inverse distance because the 16 nearest neighbors sit within
 0.8 m and the matrix loses rank. Declustering drops the fallback to 0.3% and
 moves RMSE by 0.002 m. It buys a working covariance model and the right to call
 the output kriged. It does not buy elevation accuracy.
@@ -233,7 +233,7 @@ That, and four other unresolved items, are recorded in
 | ELM | off — removed 0.00% of points on every window tested |
 | statistical outlier | on — effect is tile-dependent |
 | search radius | scaled to density, ceiling 20 m (the source's figure) |
-| neighbours | 16 |
+| neighbors | 16 |
 
 `config.verify_baseline()` raises if a configuration has drifted from these, so
 a production run stops rather than silently producing something else.
@@ -242,9 +242,9 @@ a production run stops rather than silently producing something else.
 
 ## The general point
 
-The pipeline was never badly parameterised. It was well parameterised for the
+The pipeline was never badly parameterized. It was well parameterized for the
 ground it was shown, and it was shown the wrong ground — because the window
-selector optimised for coverage, and coverage is highest exactly where terrain
+selector optimized for coverage, and coverage is highest exactly where terrain
 is flattest. Archaeological features are not on flat ground. The selection rule
 and the target were in opposition, and nothing in the scores could reveal it,
 because the scores were computed on the terrain the rule had chosen.

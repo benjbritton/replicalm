@@ -18,7 +18,7 @@ and open.
 
 The reason for building it is simple. The published method depends on commercial
 software — TerraScan, ArcGIS Pro, Golden Surfer, LAStools. If you do not have
-those licences, you cannot reproduce the published results, and you cannot apply
+those licenses, you cannot reproduce the published results, and you cannot apply
 the same processing to new data. Replicalm is an attempt to close that gap.
 
 ## What it does
@@ -27,8 +27,8 @@ You give it a point cloud and it gives you back a ground surface. In between it
 does five things:
 
 1. **Cuts the survey into manageable pieces.** Lidar tiles are large — a single
-   G-LiHT tile can be two gigabytes. The work is done in one-kilometre blocks
-   with a ten-metre overlap, so that nothing at a block edge is processed
+   G-LiHT tile can be two gigabytes. The work is done in one-kilometer blocks
+   with a ten-meter overlap, so that nothing at a block edge is processed
    without its surroundings.
 
 2. **Sorts the returns into ground and not-ground.** This is the hard part. Each
@@ -39,8 +39,8 @@ does five things:
 
    ![A slice through a mound group, showing all returns and the ones kept as ground](figures/figA_cross_section.png)
 
-   *A three-metre-wide slice cut through a mound group, seen from the side. The
-   grey dots are every laser return — canopy above, ground below. The red dots
+   *A three-meter-wide slice cut through a mound group, seen from the side. The
+   gray dots are every laser return — canopy above, ground below. The red dots
    are the ones the filter decided were the floor. The whole job is drawing that
    red line correctly, including where the ground is steep.*
 
@@ -63,12 +63,36 @@ does five things:
 
    *The eastern edge of the flight line. On the left, the raw surface: the
    ragged comb along the boundary is cells calculated from data on one side
-   only, which can be wrong by several metres. On the right, the same area after
+   only, which can be wrong by several meters. On the right, the same area after
    trimming.*
 
-The output is a GeoTIFF with two layers: the elevations, and a mask saying where
-the data is real. From there the existing G1 visualisation recipe produces the
-image archaeologists actually look at.
+6. **Makes the picture.** A bare-earth elevation model is a grid of numbers. What
+   an archaeologist actually reads is a shaded image, and the one used here is
+   G1 — four relief visualizations blended together, the recipe published as
+   Table 3 of Britton et al. 2025. Replicalm calls that recipe rather than
+   copying it, so there is only one definition of it and this software cannot
+   drift away from it.
+
+## What you get
+
+Two products, from one run:
+
+**The elevation model** — a single-band GeoTIFF of ground heights in meters.
+Zero means no data, and nothing inside the surveyed area is ever exactly zero,
+so a hole can never be mistaken for terrain. Beside it, a small JSON file
+recording the settings used, how many cells were interpolated across gaps, and
+how far the edge was trimmed.
+
+It used to carry a second layer marking where the data was real. That layer was
+removed: it repeated what the elevations already said, and a second layer is
+quietly dropped by many format conversions, which is the sort of silent loss the
+whole black-means-nothing convention exists to prevent.
+
+**The G1 image** — a three-channel picture of the same ground, plus the five
+individual visualizations it is blended from (sky-view factor, positive
+openness, slope, multi-directional hillshade and the archaeological VAT blend).
+This step is optional. It needs one extra component, the Relief Visualization
+Toolbox, and a run that only wants elevations does not have to install it.
 
 ## The tools it uses
 
@@ -77,8 +101,32 @@ Everything is free and open:
 - **PDAL** reads point clouds and runs the ground filter.
 - **GDAL** reads and writes the map files and handles coordinate systems.
 - **NumPy and SciPy** do the kriging and the arithmetic.
+- **Relief Visualization Toolbox** produces the shading the G1 image is blended
+  from. Apache-licensed, from the Slovenian Academy of Sciences and the
+  University of Ljubljana. Needed only for the picture, not for the elevations.
 - **QGIS and CloudCompare** are useful for looking at results but are not
   required by the pipeline.
+
+## Running it
+
+Three ways, all doing the same work:
+
+- **A command line**, for scripting a survey: point it at a cloud, name an
+  output folder, add `--g1` if the image is wanted.
+- **A Python call**, for building it into something larger.
+- **A desktop application** — planned, and partly built. It is a small window:
+  choose a point cloud, choose an output folder, set the cell size, tick a box
+  for the image, press Run. A progress log shows each stage as it happens,
+  because a full tile takes minutes and a window that may or may not be working
+  is worse than a slow one that says what it is doing.
+
+The desktop version is packaged as an installer carrying its own copy of Python
+and the geospatial libraries, so nothing needs to be installed or configured
+first and it cannot collide with other software on the machine. That costs about
+a gigabyte on disk and buys a program that runs on a machine where nothing has
+been set up. It is assembled but has not yet been compiled into a finished
+installer, which needs one more free tool on the build machine. The window
+itself, and everything behind it, work today.
 
 Nothing in the chain needs TerraScan, ArcGIS Pro, Surfer, or the paid LAStools
 modules.
@@ -90,13 +138,13 @@ modules.
 The overall shape of the workflow is the same, and several numbers are taken
 directly from the source and not changed:
 
-- one-kilometre processing tiles with ten-metre buffers
+- one-kilometer processing tiles with ten-meter buffers
 - height-above-ground limits of −0.5 m and 600 m
 - the near-ground band of ±0.2 m, written to class 8
 - exporting only the ground and near-ground classes
 - LAS version 1.2 output
-- a twenty-metre kriging search radius as the maximum
-- a one-metre output grid as the standard product
+- a twenty-meter kriging search radius as the maximum
+- a one-meter output grid as the standard product
 
 ### What is similar but not identical
 
@@ -115,7 +163,7 @@ rather than assumed to be right.
 
 **Interpolation.** Both krige. The published method uses Golden Surfer;
 Replicalm uses its own implementation. The search radius is the source's
-twenty metres as an upper limit, but it is scaled down where the points are
+twenty meters as an upper limit, but it is scaled down where the points are
 densely packed, because a wide search on dense data makes the mathematics
 unstable.
 
@@ -129,19 +177,19 @@ time, so Replicalm runs one pass. This is a real departure from the source and
 is recorded as such.
 
 **The elevation tolerance is tighter.** The source allows a point to sit three
-metres below the surface and still count as ground. Carried across directly,
+meters below the surface and still count as ground. Carried across directly,
 that setting lets in almost anything: it produced four times the error of a
-half-metre tolerance. Replicalm uses 0.5 m. The source's figure describes
-TerraScan's behaviour, not SMRF's.
+half-meter tolerance. Replicalm uses 0.5 m. The source's figure describes
+TerraScan's behavior, not SMRF's.
 
 **There is one setting the source could not have.** SMRF works on its own
-internal grid, and TerraScan has no equivalent. Left at one metre while
-producing a half-metre map, it turns steep slopes into staircases. Tying it to
+internal grid, and TerraScan has no equivalent. Left at one meter while
+producing a half-meter map, it turns steep slopes into staircases. Tying it to
 the output cell size removes most of that.
 
 **The output grid is declared rather than derived.** The original products have
-cells of 0.500042 by 0.499988 metres on origins that are multiples of nothing,
-which means neighbouring tiles do not line up without resampling. Replicalm puts
+cells of 0.500042 by 0.499988 meters on origins that are multiples of nothing,
+which means neighboring tiles do not line up without resampling. Replicalm puts
 cell edges on whole multiples of the cell size, so tiles join exactly and a
 re-run reproduces the previous result. For direct comparison against an original
 product, it can adopt that product's grid instead.
@@ -156,19 +204,19 @@ tile.
 
 ![The original workflow and Replicalm over the same mound group](figures/figB_archive_vs_replicalm.png)
 
-*The same ground, same point cloud, same visualisation recipe. On the left, the
+*The same ground, same point cloud, same visualization recipe. On the left, the
 surface from the original commercial workflow. On the right, Replicalm.*
 
 Tested on South_GLAS_l0s395, a tile with known structures, against the
 reference surface from the original workflow:
 
-- Half the cells agree to within 1.5 millimetres.
-- Across the whole tile the root-mean-square difference is 6 centimetres.
+- Half the cells agree to within 1.5 millimeters.
+- Across the whole tile the root-mean-square difference is 6 centimeters.
 - On flat ground, fewer than one cell in ten thousand differs by more than half
-  a metre.
+  a meter.
 - On slopes steeper than thirty degrees, about one cell in forty-five does.
 - Platforms, plazas, range structures and looter trenches read clearly in the
-  resulting visualisation.
+  resulting visualization.
 
 The remaining disagreement is almost entirely on steep ground. Below ten
 degrees of slope the two surfaces are effectively the same; above thirty degrees
@@ -199,7 +247,7 @@ Three things are recorded in `docs/open_observations.md` rather than glossed:
 | low-point filter (ELM) | off — removed nothing when tested |
 | outlier filter | on — effect varies by tile |
 | kriging search radius | scaled to point density, never above 20 m |
-| neighbours per cell | 16 |
+| neighbors per cell | 16 |
 
 These are recorded in code as well as in this table, and the software will
 refuse a production run if the configuration has drifted from them.

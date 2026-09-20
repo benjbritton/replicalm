@@ -4,7 +4,7 @@ Measurement output from the harness, kept so that the numbers quoted in
 `docs/` and `README.md` can be traced to the run that produced them without
 re-processing anything.
 
-## Paths are tokenised
+## Paths are tokenized
 
 Absolute drive letters have been replaced with tokens:
 

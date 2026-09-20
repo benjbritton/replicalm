@@ -74,7 +74,7 @@ Removing 0.05% to 0.36% of ground points, measured on three relief windows:
 | l0s417 | 0.1685 | 0.2195 | 8.20% | 8.43% |
 | l2s444 | 0.0481 | 0.0489 | 2.13% | 1.79% |
 
-It is on in the baseline because the aggregate favours it, but the aggregate is
+It is on in the baseline because the aggregate favors it, but the aggregate is
 carried by one window. What distinguishes `l0s395` from `l0s417` is not known.
 Worth sweeping per survey rather than trusting.
 
@@ -84,7 +84,7 @@ Worth sweeping per survey rather than trusting.
 
 **Status:** open.
 
-Asking for 6.00 points per square metre returned 2.38; asking for 2.08 returned
+Asking for 6.00 points per square meter returned 2.38; asking for 2.08 returned
 1.32. The undershoot is roughly 1.5x to 2.5x and scales with how clustered the
 returns are, because the routine keeps one point per cell of a grid sized from
 the target and many cells are empty where returns follow scan lines.
@@ -99,8 +99,8 @@ to buy no accuracy (see below), but any future use of it does.
 
 **Status:** understood, recorded so it is not mistaken for a quality setting.
 
-On `l0s444`'s relief window at 8.18 ground points per square metre, 76% of cells
-fell back to inverse distance because the sixteen nearest neighbours sit within
+On `l0s444`'s relief window at 8.18 ground points per square meter, 76% of cells
+fell back to inverse distance because the sixteen nearest neighbors sit within
 about 0.8 m and every pairwise semivariance is nearly identical, so the matrix
 loses rank. Thinning drops the fallback to 0.3%. It moves RMSE by 0.002 m.
 
@@ -122,7 +122,7 @@ earlier conclusions.
 Windows were chosen for maximum reference coverage, which finds flat, open
 ground. Measured after the fact, every calibration window contained between
 0.00% and 0.20% of cells steeper than twenty degrees. On `l0s395` the error
-below ten degrees is 0.01% to 0.08% of cells past half a metre under every
+below ten degrees is 0.01% to 0.08% of cells past half a meter under every
 configuration tried, and above thirty degrees it ranges from 2.25% to 40.38%;
 97.7% of all large error sits on slopes above ten degrees, which are 15.5% of
 the tile.
