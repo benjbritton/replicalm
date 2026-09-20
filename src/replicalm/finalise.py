@@ -140,11 +140,19 @@ def finalise(dem, grid, wkt, path, radius_m, nodata_in=-9999.0,
         raise FinaliseError("erosion of %d cells removed the whole raster"
                             % cells)
 
+    # Single band. The mask band restated what band 1 already says -- zero is
+    # no data, and no valid cell is exactly zero -- while failing to record the
+    # one thing it could usefully have carried, which cells were interpolated.
+    # That provenance is in the report below and belongs in the run's sidecar
+    # JSON, not in a band every consumer has to know to ignore.
     M.write_masked_geotiff(filled, grid, wkt, path, valid=trimmed,
                            nodata_value=0.0, erode_cells=0,
-                           write_mask_band=True, verbose=verbose)
+                           write_mask_band=False, verbose=verbose)
     report.update({"erode_cells": cells, "erode_m": cells * grid.cell,
                    "cells_before_trim": int(covered.sum()),
                    "cells_after_trim": int(trimmed.sum()),
+                   "filled_fraction": (report["filled_cells"] /
+                                       max(int(trimmed.sum()), 1)),
+                   "bands": 1,
                    "path": str(path)})
     return report

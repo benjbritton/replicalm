@@ -1,0 +1,32 @@
+# The runtime environment, pinned.
+#
+# Pinned because the installer ships whatever this resolves to, and a build in
+# six months that quietly picks up a different PDAL is a build whose output
+# cannot be compared with the measurements behind the locked baseline.
+#
+# Versions below are the ones the baseline was measured against. Raise them
+# deliberately, and re-run benchmarks/recalibrate.py when you do.
+name: replicalm
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - pdal=2.6.*
+  - python-pdal=3.2.*
+  - gdal=3.8.*
+  - libgdal=3.8.*
+  - numpy=1.26.*
+  - scipy=1.11.*
+  - rasterio=1.3.*      # GLiHT_rvt.py reads and writes through rasterio, not
+                        # GDAL directly; without it the optional image step
+                        # fails on a clean install
+  - matplotlib-base=3.8.*   # declared by rvt-py; not on the critical path --
+                            # rvt.vis, rvt.blend and GLiHT_rvt.py all import
+                            # without it
+  - tk                  # tkinter, for the launcher
+  - pip
+  - pip:
+      # Relief Visualization Toolbox, Apache-2.0, ZRC SAZU / UL FGG.
+      # Only needed for the optional G1 image step.
+      - rvt-py==2.2.1

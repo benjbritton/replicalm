@@ -115,12 +115,29 @@ def erode(valid, cells=1):
 
 
 def write_masked_geotiff(dem, grid, wkt, path, valid=None, nodata_value=0.0,
-                         erode_cells=0, write_mask_band=True, verbose=True):
-    """Write a DEM under the convention, optionally with the mask as band 2.
+                         erode_cells=0, write_mask_band=False, verbose=True):
+    """Write a DEM under the convention. Single band by default.
 
-    The second band is not redundant with the zero convention: it records where
-    data was expected, so a reader can distinguish "outside the survey" from
-    "inside the survey and missing", which the elevation band alone cannot.
+    WHY THE MASK BAND IS NO LONGER WRITTEN
+    --------------------------------------
+    It used to be, on the argument that it recorded where data was expected and
+    so distinguished "outside the survey" from "inside the survey and missing",
+    which the elevation band cannot. In practice it did not do that: `finalise`
+    built it from coverage OR fill, so interpolated cells were flagged
+    identically to measured ones. What remained was a restatement of something
+    band 1 already says unambiguously -- zero is no data, and no valid cell is
+    ever exactly zero, because `enforce` lifts any that would be.
+
+    It also cost more than it appeared to: a Float32 band carrying a boolean,
+    and a second band that disappears silently through any format conversion
+    without multiband support, which is the exact quiet failure this convention
+    exists to prevent.
+
+    Fill provenance is reported by `finalise` and belongs in the run's sidecar
+    JSON, where the counts already go. On the locked baseline it amounts to
+    1,241 cells in 12.4 million, about 0.01%.
+
+    `write_mask_band=True` still writes it, for a caller who wants the old shape.
     """
     from osgeo import gdal, osr
     gdal.UseExceptions()

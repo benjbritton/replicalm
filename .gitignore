@@ -40,3 +40,9 @@ venv/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Installer build artifacts: a packed environment and a compiled setup.exe,
+# both rebuilt by packaging/build.ps1
+packaging/stage/
+packaging/dist/
+packaging/*.log
