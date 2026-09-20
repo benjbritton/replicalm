@@ -1,0 +1,23 @@
+# Auto-detect text files and normalise to LF in the repository,
+# converting to CRLF on checkout where the platform expects it.
+* text=auto
+
+# Enforce LF for source and data-interchange files
+*.py    text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.txt   text eol=lf
+*.cfg   text eol=lf
+*.toml  text eol=lf
+
+# Keep binary assets untouched
+*.png   binary
+*.jpg   binary
+*.docx  binary
+*.las   binary
+*.laz   binary
+*.tif   binary
+*.tiff  binary
+*.ovr   binary

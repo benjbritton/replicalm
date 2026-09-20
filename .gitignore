@@ -1,7 +1,9 @@
-# Processing output and intermediates. These are gigabytes of derived rasters
-# and point clouds; everything needed to regenerate them is tracked.
+# Local renders, archive binaries and working intermediates. These are
+# gigabytes of derived rasters and point clouds; everything needed to
+# regenerate them is tracked, and archive/README.md says how.
 render*/
-archive/render*/
+archive/*
+!archive/README.md
 tests/
 benchmarks/*/*.las
 benchmarks/*/*.laz
