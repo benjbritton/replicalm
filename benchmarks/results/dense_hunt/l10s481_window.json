@@ -1,0 +1,18 @@
+{
+ "tile": "l10s481",
+ "region": "Yuc_Centro",
+ "window": {
+  "minx": 279830.5409739499,
+  "maxy": 2164049.25906628,
+  "maxx": 280230.55747237604,
+  "miny": 2163649.242567854,
+  "cell": 0.5000206230326715,
+  "coverage": 0.8884390625,
+  "window_m": 400.01649842613716
+ },
+ "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\AMIGACarb_Yuc_Centro_NFI_Apr2013_l10s481.las",
+ "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\Centro_NFI_l10s481_DEM_0p5m_v1.tif",
+ "clipped_las": "C:\\Replicalm\\tests\\dense_hunt\\l10s481_clip.las",
+ "clipped_reference": "C:\\Replicalm\\tests\\dense_hunt\\l10s481_reference.tif",
+ "points": 1607641
+}

@@ -1,0 +1,18 @@
+{
+ "tile": "l5s379",
+ "region": "Yuc_North2",
+ "window": {
+  "minx": 298275.01436801837,
+  "maxy": 2297787.543962264,
+  "maxx": 298675.0339548585,
+  "miny": 2297387.524375424,
+  "cell": 0.5000244835501197,
+  "coverage": 0.8508515625,
+  "window_m": 400.0195868400958
+ },
+ "source_las": "D:\\GLiHT_LAS_orig\\Yuc_North2\\North2_NFI\\North2_NFI\\AMIGACarb_Yuc_North_2_NFI_Apr2013_l5s379.las",
+ "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_North2\\North2_NFI\\North2_NFI\\North2_NFI_l5s379_DEM_0p5m_v1.tif",
+ "clipped_las": "C:\\Replicalm\\tests\\dense_hunt\\l5s379_clip.las",
+ "clipped_reference": "C:\\Replicalm\\tests\\dense_hunt\\l5s379_reference.tif",
+ "points": 1398134
+}

@@ -1,0 +1,59 @@
+[
+ {
+  "tile": "l8s431",
+  "region": "Yuc_Centro",
+  "window": {
+   "minx": 311719.47763486,
+   "maxy": 2153034.218861883,
+   "maxx": 312119.48226127686,
+   "miny": 2152634.214235466,
+   "cell": 0.5000057830210488,
+   "coverage": 0.94850625,
+   "window_m": 400.0046264168391
+  },
+  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\AMIGACarb_Yuc_Centro_NFI_Apr2013_l8s431.las",
+  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\Centro_NFI_l8s431_DEM_0p5m_v1.tif",
+  "clipped_las": "C:\\Replicalm\\tests\\clips\\l8s431_clip.las",
+  "clipped_reference": "C:\\Replicalm\\tests\\clips\\l8s431_reference.tif",
+  "points": 1160361,
+  "seconds": 12.3
+ },
+ {
+  "tile": "l0s444",
+  "region": "Yuc_Centro",
+  "window": {
+   "minx": 289829.2322067239,
+   "maxy": 2104684.7125463616,
+   "maxx": 290229.2608190272,
+   "miny": 2104284.6839340585,
+   "cell": 0.5000357653791255,
+   "coverage": 0.8669484375,
+   "window_m": 400.0286123033004
+  },
+  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s444.las",
+  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s444_DEM_0p5m_v1.tif",
+  "clipped_las": "C:\\Replicalm\\tests\\clips\\l0s444_clip.las",
+  "clipped_reference": "C:\\Replicalm\\tests\\clips\\l0s444_reference.tif",
+  "points": 4228475,
+  "seconds": 28.6
+ },
+ {
+  "tile": "l0s395",
+  "region": "Yuc_South",
+  "window": {
+   "minx": 751879.2464382139,
+   "maxy": 2097852.997690825,
+   "maxx": 752279.2796677051,
+   "miny": 2097452.9644613336,
+   "cell": 0.5000415368639651,
+   "coverage": 0.9794203125,
+   "window_m": 400.0332294911721
+  },
+  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_Glas\\South_Glas\\AMIGACarb_Yuc_South_GLAS_Apr2013_l0s395.las",
+  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_Glas\\South_Glas\\South_GLAS_l0s395_DEM_0p5m_v1.tif",
+  "clipped_las": "C:\\Replicalm\\tests\\clips\\l0s395_clip.las",
+  "clipped_reference": "C:\\Replicalm\\tests\\clips\\l0s395_reference.tif",
+  "points": 949707,
+  "seconds": 12.4
+ }
+]

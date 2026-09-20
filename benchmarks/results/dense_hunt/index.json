@@ -1,0 +1,90 @@
+[
+ {
+  "tile": "l0s448",
+  "region": "Yuc_Centro",
+  "window": {
+   "minx": 285031.26034562214,
+   "maxy": 2072583.3332652154,
+   "maxx": 285431.30571960297,
+   "miny": 2072183.2878912345,
+   "cell": 0.5000567174760633,
+   "coverage": 0.8461125,
+   "window_m": 400.0453739808506
+  },
+  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s448.las",
+  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s448_DEM_0p5m_v1.tif",
+  "clipped_las": "C:\\Replicalm\\tests\\dense_hunt\\l0s448_clip.las",
+  "clipped_reference": "C:\\Replicalm\\tests\\dense_hunt\\l0s448_reference.tif",
+  "points": 3797240,
+  "clip_density": 23.727366669283946,
+  "header_density": 6.225371961807729,
+  "multi_return_frac": 0.48176244545990243,
+  "ground_density": 8.413547361054546
+ },
+ {
+  "tile": "l1s471",
+  "region": "Yuc_Centro",
+  "window": {
+   "minx": 267121.64381104894,
+   "maxy": 2163260.707588122,
+   "maxx": 267521.6630264212,
+   "miny": 2162860.68837275,
+   "cell": 0.5000240192153713,
+   "coverage": 0.9342,
+   "window_m": 400.019215372297
+  },
+  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l1s471.las",
+  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l1s471_DEM_0p5m_v1.tif",
+  "clipped_las": "C:\\Replicalm\\tests\\dense_hunt\\l1s471_clip.las",
+  "clipped_reference": "C:\\Replicalm\\tests\\dense_hunt\\l1s471_reference.tif",
+  "points": 3652950,
+  "clip_density": 22.828744133230348,
+  "header_density": 7.120030121221319,
+  "multi_return_frac": 0.5273387361467998,
+  "ground_density": 7.429517428138126
+ },
+ {
+  "tile": "l0s447",
+  "region": "Yuc_Centro",
+  "window": {
+   "minx": 285896.6405313257,
+   "maxy": 2078239.826393469,
+   "maxx": 286296.65160782274,
+   "miny": 2077839.8153169719,
+   "cell": 0.500013845621315,
+   "coverage": 0.870096875,
+   "window_m": 400.011076497052
+  },
+  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s447.las",
+  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s447_DEM_0p5m_v1.tif",
+  "clipped_las": "C:\\Replicalm\\tests\\dense_hunt\\l0s447_clip.las",
+  "clipped_reference": "C:\\Replicalm\\tests\\dense_hunt\\l0s447_reference.tif",
+  "points": 3580619,
+  "clip_density": 22.3776294041101,
+  "header_density": 6.517188153148586,
+  "multi_return_frac": 0.5169711285436341,
+  "ground_density": 7.107793847261732
+ },
+ {
+  "tile": "l0s449",
+  "region": "Yuc_Centro",
+  "window": {
+   "minx": 283738.3331527438,
+   "maxy": 2063752.0862543844,
+   "maxx": 284138.3695036701,
+   "miny": 2063352.0499034582,
+   "cell": 0.5000454386578136,
+   "coverage": 0.84955,
+   "window_m": 400.03635092625086
+  },
+  "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s449.las",
+  "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s449_DEM_0p5m_v1.tif",
+  "clipped_las": "C:\\Replicalm\\tests\\dense_hunt\\l0s449_clip.las",
+  "clipped_reference": "C:\\Replicalm\\tests\\dense_hunt\\l0s449_reference.tif",
+  "points": 3478250,
+  "clip_density": 21.73511186325455,
+  "header_density": 6.183305068061275,
+  "multi_return_frac": 0.4809924818257748,
+  "ground_density": 5.352814556956811
+ }
+]

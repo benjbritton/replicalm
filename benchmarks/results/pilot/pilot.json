@@ -1,0 +1,302 @@
+[
+ {
+  "range_m": 14.387599966341671,
+  "radius_m": 14.387599966341671,
+  "fallback": 0.00496543872489225,
+  "rmse_m": 0.10773971000362718,
+  "ratio": 1.009147748623556,
+  "complexity_reference": 0.09293919138069229,
+  "variance_coverage": 0.9547393882646692,
+  "tile": "l4s478",
+  "classifier": "smrf_t050",
+  "params": {
+   "algorithm": "smrf",
+   "slope": 0.05,
+   "threshold_m": 0.5
+  },
+  "ground_points": 509755,
+  "density": 3.1811124362725374,
+  "thinned": false,
+  "seconds": 70.8
+ },
+ {
+  "range_m": 14.385232076453406,
+  "radius_m": 14.385232076453406,
+  "fallback": 0.005103717028329045,
+  "rmse_m": 0.11765777512640202,
+  "ratio": 0.931877057247579,
+  "complexity_reference": 0.09293919138069229,
+  "variance_coverage": 0.9546004993757803,
+  "tile": "l4s478",
+  "classifier": "smrf_t025",
+  "params": {
+   "algorithm": "smrf",
+   "slope": 0.05,
+   "threshold_m": 0.25
+  },
+  "ground_points": 502405,
+  "density": 3.1352449579611856,
+  "thinned": false,
+  "seconds": 71.5
+ },
+ {
+  "range_m": 14.384401135539605,
+  "radius_m": 14.384401135539605,
+  "fallback": 0.00460699052248348,
+  "rmse_m": 0.13259061988982193,
+  "ratio": 0.9719260367311325,
+  "complexity_reference": 0.09293919138069229,
+  "variance_coverage": 0.954878277153558,
+  "tile": "l4s478",
+  "classifier": "csf_r2",
+  "params": {
+   "algorithm": "csf",
+   "csf_rigidness": 2,
+   "csf_threshold_m": 0.5
+  },
+  "ground_points": 505611,
+  "density": 3.1552519151674705,
+  "thinned": false,
+  "seconds": 70.4
+ },
+ {
+  "range_m": 14.383862914564329,
+  "radius_m": 14.383862914564329,
+  "fallback": 0.003982229116135299,
+  "rmse_m": 0.10654931191373612,
+  "ratio": 1.2297135820702105,
+  "complexity_reference": 0.1077360639330791,
+  "variance_coverage": 0.8337187890137329,
+  "tile": "l0s417",
+  "classifier": "smrf_t050",
+  "params": {
+   "algorithm": "smrf",
+   "slope": 0.05,
+   "threshold_m": 0.5
+  },
+  "ground_points": 483680,
+  "density": 3.0192875475926093,
+  "thinned": false,
+  "seconds": 68.6
+ },
+ {
+  "range_m": 14.382895738610973,
+  "radius_m": 14.382895738610973,
+  "fallback": 0.004224916191534506,
+  "rmse_m": 0.07470739776259938,
+  "ratio": 1.071573779655141,
+  "complexity_reference": 0.1077360639330791,
+  "variance_coverage": 0.8334519350811486,
+  "tile": "l0s417",
+  "classifier": "smrf_t025",
+  "params": {
+   "algorithm": "smrf",
+   "slope": 0.05,
+   "threshold_m": 0.25
+  },
+  "ground_points": 443777,
+  "density": 2.7702000703109606,
+  "thinned": false,
+  "seconds": 68.3
+ },
+ {
+  "range_m": 14.383804510345076,
+  "radius_m": 14.383804510345076,
+  "fallback": 0.010924457506881402,
+  "rmse_m": 0.28822516182389923,
+  "ratio": 1.5587641458893744,
+  "complexity_reference": 0.1077360639330791,
+  "variance_coverage": 0.8276685393258427,
+  "tile": "l0s417",
+  "classifier": "csf_r2",
+  "params": {
+   "algorithm": "csf",
+   "csf_rigidness": 2,
+   "csf_threshold_m": 0.5
+  },
+  "ground_points": 456773,
+  "density": 2.8513253204112616,
+  "thinned": false,
+  "seconds": 70.0
+ },
+ {
+  "range_m": 6.984750618665643,
+  "radius_m": 6.984750618665643,
+  "fallback": 3.2663033448579404e-06,
+  "rmse_m": 0.020128980215541523,
+  "ratio": 0.8924162642556613,
+  "complexity_reference": 0.041714864790531304,
+  "variance_coverage": 0.9555415106117353,
+  "tile": "l2s444",
+  "classifier": "smrf_t050",
+  "params": {
+   "algorithm": "smrf",
+   "slope": 0.05,
+   "threshold_m": 0.5
+  },
+  "ground_points": 608312,
+  "density": 3.7970504446432707,
+  "thinned": false,
+  "seconds": 71.0
+ },
+ {
+  "range_m": 8.124431913670668,
+  "radius_m": 8.124431913670668,
+  "fallback": 1.6299493411744763e-06,
+  "rmse_m": 0.015428855690956002,
+  "ratio": 0.7667465539253037,
+  "complexity_reference": 0.041714864790531304,
+  "variance_coverage": 0.9574204119850187,
+  "tile": "l2s444",
+  "classifier": "smrf_t025",
+  "params": {
+   "algorithm": "smrf",
+   "slope": 0.05,
+   "threshold_m": 0.25
+  },
+  "ground_points": 603673,
+  "density": 3.7680940587546146,
+  "thinned": false,
+  "seconds": 70.6
+ },
+ {
+  "range_m": 6.984951632406858,
+  "radius_m": 6.984951632406858,
+  "fallback": 3.2663033448579404e-06,
+  "rmse_m": 0.020176104122495295,
+  "ratio": 0.8945749713584287,
+  "complexity_reference": 0.041714864790531304,
+  "variance_coverage": 0.9555415106117353,
+  "tile": "l2s444",
+  "classifier": "csf_r2",
+  "params": {
+   "algorithm": "csf",
+   "csf_rigidness": 2,
+   "csf_threshold_m": 0.5
+  },
+  "ground_points": 608339,
+  "density": 3.7972189771759273,
+  "thinned": false,
+  "seconds": 68.2
+ },
+ {
+  "range_m": 4.129585731927261,
+  "radius_m": 4.129585731927261,
+  "fallback": 0.0007454437961082693,
+  "rmse_m": 0.0648883550951097,
+  "ratio": 1.3324581860239022,
+  "complexity_reference": 0.04184250481196797,
+  "variance_coverage": 0.7279775280898877,
+  "tile": "l0s419",
+  "classifier": "smrf_t050",
+  "params": {
+   "algorithm": "smrf",
+   "slope": 0.05,
+   "threshold_m": 0.5
+  },
+  "ground_points": 165884,
+  "density": 1.0354075050378717,
+  "thinned": false,
+  "seconds": 64.6
+ },
+ {
+  "range_m": 9.257150155223009,
+  "radius_m": 9.257150155223009,
+  "fallback": 0.00016814304461942257,
+  "rmse_m": 0.04495641309256487,
+  "ratio": 0.899526884394613,
+  "complexity_reference": 0.04184250481196797,
+  "variance_coverage": 0.7609207240948814,
+  "tile": "l0s419",
+  "classifier": "smrf_t025",
+  "params": {
+   "algorithm": "smrf",
+   "slope": 0.05,
+   "threshold_m": 0.25
+  },
+  "ground_points": 156236,
+  "density": 0.9751870400828104,
+  "thinned": false,
+  "seconds": 66.4
+ },
+ {
+  "range_m": 3.560602563333473,
+  "radius_m": 3.560602563333473,
+  "fallback": 0.0008187599189581335,
+  "rmse_m": 0.05788513075705329,
+  "ratio": 1.3472985898965215,
+  "complexity_reference": 0.04184250481196797,
+  "variance_coverage": 0.710352684144819,
+  "tile": "l0s419",
+  "classifier": "csf_r2",
+  "params": {
+   "algorithm": "csf",
+   "csf_rigidness": 2,
+   "csf_threshold_m": 0.5
+  },
+  "ground_points": 166077,
+  "density": 1.0366121640072257,
+  "thinned": false,
+  "seconds": 61.3
+ },
+ {
+  "range_m": 8.699090457204372,
+  "radius_m": 8.699090457204372,
+  "fallback": 0.00048178870906407306,
+  "rmse_m": 0.015709524903367078,
+  "ratio": 0.840401432263298,
+  "complexity_reference": 0.040812036593291634,
+  "variance_coverage": 0.9680165418227216,
+  "tile": "l2s443",
+  "classifier": "smrf_t050",
+  "params": {
+   "algorithm": "smrf",
+   "slope": 0.05,
+   "threshold_m": 0.5
+  },
+  "ground_points": 800774,
+  "density": 4.998905196616185,
+  "thinned": false,
+  "seconds": 63.0
+ },
+ {
+  "range_m": 8.131116249713823,
+  "radius_m": 8.131116249713823,
+  "fallback": 0.0004984699070974694,
+  "rmse_m": 0.014864601363814213,
+  "ratio": 0.7535028817695629,
+  "complexity_reference": 0.040812036593291634,
+  "variance_coverage": 0.9668976279650437,
+  "tile": "l2s443",
+  "classifier": "smrf_t025",
+  "params": {
+   "algorithm": "smrf",
+   "slope": 0.05,
+   "threshold_m": 0.25
+  },
+  "ground_points": 796916,
+  "density": 4.974821277497251,
+  "thinned": false,
+  "seconds": 63.8
+ },
+ {
+  "range_m": 8.130444604456537,
+  "radius_m": 8.130444604456537,
+  "fallback": 0.000493630393436329,
+  "rmse_m": 0.016826328052112937,
+  "ratio": 0.8794190029586946,
+  "complexity_reference": 0.040812036593291634,
+  "variance_coverage": 0.9669023096129837,
+  "tile": "l2s443",
+  "classifier": "csf_r2",
+  "params": {
+   "algorithm": "csf",
+   "csf_rigidness": 2,
+   "csf_threshold_m": 0.5
+  },
+  "ground_points": 801067,
+  "density": 5.0007342760101325,
+  "thinned": false,
+  "seconds": 61.2
+ }
+]

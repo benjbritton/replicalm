@@ -1,0 +1,18 @@
+{
+ "tile": "l1s400",
+ "region": "Yuc_South",
+ "window": {
+  "minx": 747701.189889724,
+  "maxy": 2064502.9358151322,
+  "maxx": 748101.2063314418,
+  "miny": 2064102.9193734145,
+  "cell": 0.5000205521472036,
+  "coverage": 0.791865625,
+  "window_m": 400.0164417177629
+ },
+ "source_las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_Glas\\South_Glas\\AMIGACarb_Yuc_South_GLAS_Apr2013_l1s400.las",
+ "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_Glas\\South_Glas\\South_GLAS_l1s400_DEM_0p5m_v1.tif",
+ "clipped_las": "C:\\Replicalm\\tests\\dense_clips\\l1s400_clip.las",
+ "clipped_reference": "C:\\Replicalm\\tests\\dense_clips\\l1s400_reference.tif",
+ "points": 1889199
+}

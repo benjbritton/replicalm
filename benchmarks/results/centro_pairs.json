@@ -1,0 +1,20 @@
+﻿[
+    {
+        "tile":  "l0s435",
+        "lasMB":  1706.6,
+        "las":  "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s435.las",
+        "dem":  "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s435_DEM_0p5m_v1.tif"
+    },
+    {
+        "tile":  "l0s436",
+        "lasMB":  1805.5,
+        "las":  "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s436.las",
+        "dem":  "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s436_DEM_0p5m_v1.tif"
+    },
+    {
+        "tile":  "l0s437",
+        "lasMB":  1445.8,
+        "las":  "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s437.las",
+        "dem":  "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s437_DEM_0p5m_v1.tif"
+    }
+]

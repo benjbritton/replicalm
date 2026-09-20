@@ -1,0 +1,129 @@
+{
+ "reference_pits": 0.03725813727853069,
+ "arms": [
+  {
+   "arm": "off",
+   "params": {
+    "remove_low_noise": false,
+    "remove_outliers": false
+   },
+   "density": 5.003143916440383,
+   "radius": 4.035743430608199,
+   "pits": 0.03733988136840738,
+   "flat_over": 1.4432067228692599e-05,
+   "rmse": 0.017904305227950133,
+   "fallback": 0.0003584422101546678,
+   "seconds": 104.4
+  },
+  {
+   "arm": "elm1.0_out2.5",
+   "params": {
+    "remove_low_noise": true,
+    "remove_outliers": true,
+    "elm_threshold_m": 1.0,
+    "outlier_multiplier": 2.5
+   },
+   "density": 4.979228547299731,
+   "radius": 4.045423713193927,
+   "pits": 0.037576489017200086,
+   "flat_over": 1.65325805498323e-05,
+   "rmse": 0.018905499853592973,
+   "fallback": 0.00035671974918347174,
+   "seconds": 108.5
+  },
+  {
+   "arm": "elm0.5_out2.5",
+   "params": {
+    "remove_low_noise": true,
+    "remove_outliers": true,
+    "elm_threshold_m": 0.5,
+    "outlier_multiplier": 2.5
+   },
+   "density": 4.979228547299731,
+   "radius": 4.045423713193927,
+   "pits": 0.037576489017200086,
+   "flat_over": 1.65325805498323e-05,
+   "rmse": 0.018905499853592973,
+   "fallback": 0.00035671974918347174,
+   "seconds": 109.9
+  },
+  {
+   "arm": "elm2.0_out2.5",
+   "params": {
+    "remove_low_noise": true,
+    "remove_outliers": true,
+    "elm_threshold_m": 2.0,
+    "outlier_multiplier": 2.5
+   },
+   "density": 4.979228547299731,
+   "radius": 4.045423713193927,
+   "pits": 0.037576489017200086,
+   "flat_over": 1.65325805498323e-05,
+   "rmse": 0.018905499853592973,
+   "fallback": 0.00035671974918347174,
+   "seconds": 109.7
+  },
+  {
+   "arm": "elm1.0_out2.0",
+   "params": {
+    "remove_low_noise": true,
+    "remove_outliers": true,
+    "elm_threshold_m": 1.0,
+    "outlier_multiplier": 2.0
+   },
+   "density": 4.974921158965863,
+   "radius": 4.047174639510866,
+   "pits": 0.037859403058114124,
+   "flat_over": 1.6588630981756652e-05,
+   "rmse": 0.01893989853879493,
+   "fallback": 0.0003579562341033771,
+   "seconds": 109.9
+  },
+  {
+   "arm": "elm1.0_out3.5",
+   "params": {
+    "remove_low_noise": true,
+    "remove_outliers": true,
+    "elm_threshold_m": 1.0,
+    "outlier_multiplier": 3.5
+   },
+   "density": 4.988405157228407,
+   "radius": 4.041701044039603,
+   "pits": 0.03737883908344784,
+   "flat_over": 1.4442339989188876e-05,
+   "rmse": 0.018705899060987664,
+   "fallback": 0.00033633641478443446,
+   "seconds": 110.6
+  },
+  {
+   "arm": "elm_only",
+   "params": {
+    "remove_low_noise": true,
+    "remove_outliers": false,
+    "elm_threshold_m": 1.0
+   },
+   "density": 5.003143916440383,
+   "radius": 4.035743430608199,
+   "pits": 0.03733988136840738,
+   "flat_over": 1.4432067228692599e-05,
+   "rmse": 0.017904305227950133,
+   "fallback": 0.0003584422101546678,
+   "seconds": 104.9
+  },
+  {
+   "arm": "outlier_only",
+   "params": {
+    "remove_low_noise": false,
+    "remove_outliers": true,
+    "outlier_multiplier": 2.5
+   },
+   "density": 4.979228547299731,
+   "radius": 4.045423713193927,
+   "pits": 0.037576489017200086,
+   "flat_over": 1.65325805498323e-05,
+   "rmse": 0.018905499853592973,
+   "fallback": 0.00035671974918347174,
+   "seconds": 109.6
+  }
+ ]
+}

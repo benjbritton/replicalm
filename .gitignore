@@ -1,0 +1,40 @@
+# Processing output and intermediates. These are gigabytes of derived rasters
+# and point clouds; everything needed to regenerate them is tracked.
+render*/
+archive/render*/
+tests/
+benchmarks/*/*.las
+benchmarks/*/*.laz
+benchmarks/*/*.tif
+*.las
+*.laz
+*.tif
+*.tiff
+*.ovr
+*.aux.xml
+
+# Logs
+*.log
+
+# Figures are tracked; other images are not
+*.jpg
+*.jpeg
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Editors and OS
+.~lock.*#
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,18 @@
+{
+ "tile": "l0s419",
+ "region": "Yuc_South_NFI",
+ "window": {
+  "minx": 790217.6163516125,
+  "maxy": 1977646.6858377722,
+  "maxx": 790617.6207059465,
+  "miny": 1977246.6814834382,
+  "cell": 0.5000054429174088,
+  "coverage": 0.7336484375,
+  "window_m": 400.00435433392704
+ },
+ "source_las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l0s419.las",
+ "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l0s419_DEM_0p5m_v1.tif",
+ "clipped_las": "C:\\Replicalm\\tests\\pilot_clips\\l0s419_clip.las",
+ "clipped_reference": "C:\\Replicalm\\tests\\pilot_clips\\l0s419_reference.tif",
+ "points": 1959035
+}

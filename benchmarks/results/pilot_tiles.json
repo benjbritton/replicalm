@@ -1,0 +1,46 @@
+{
+ "seed": 20260919,
+ "pool": 41,
+ "excluded": [
+  "l0s395",
+  "l0s444",
+  "l8s431"
+ ],
+ "tiles": [
+  {
+   "region": "Yuc_South_NFI",
+   "tile": "l4s478",
+   "las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l4s478.las",
+   "reference_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l4s478_DEM_0p5m_v1.tif",
+   "chosen": "random draw, seed 20260919, pool excludes l0s395/l0s444/l8s431"
+  },
+  {
+   "region": "Yuc_South_NFI",
+   "tile": "l0s417",
+   "las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l0s417.las",
+   "reference_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l0s417_DEM_0p5m_v1.tif",
+   "chosen": "random draw, seed 20260919, pool excludes l0s395/l0s444/l8s431"
+  },
+  {
+   "region": "Yuc_South_NFI",
+   "tile": "l2s444",
+   "las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l2s444.las",
+   "reference_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l2s444_DEM_0p5m_v1.tif",
+   "chosen": "random draw, seed 20260919, pool excludes l0s395/l0s444/l8s431"
+  },
+  {
+   "region": "Yuc_South_NFI",
+   "tile": "l0s419",
+   "las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l0s419.las",
+   "reference_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l0s419_DEM_0p5m_v1.tif",
+   "chosen": "random draw, seed 20260919, pool excludes l0s395/l0s444/l8s431"
+  },
+  {
+   "region": "Yuc_South_NFI",
+   "tile": "l2s443",
+   "las": "D:\\GLiHT_LAS_orig\\Yuc_South\\South_NFI\\South_NFI\\AMIGACarb_Yuc_South_NFI_Apr2013_l2s443.las",
+   "reference_dem": "D:\\_Archive_EdgeFixed\\Yuc_South\\South_NFI\\South_NFI\\South_NFI_l2s443_DEM_0p5m_v1.tif",
+   "chosen": "random draw, seed 20260919, pool excludes l0s395/l0s444/l8s431"
+  }
+ ]
+}

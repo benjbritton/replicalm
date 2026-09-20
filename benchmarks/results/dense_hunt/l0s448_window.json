@@ -1,0 +1,18 @@
+{
+ "tile": "l0s448",
+ "region": "Yuc_Centro",
+ "window": {
+  "minx": 285031.26034562214,
+  "maxy": 2072583.3332652154,
+  "maxx": 285431.30571960297,
+  "miny": 2072183.2878912345,
+  "cell": 0.5000567174760633,
+  "coverage": 0.8461125,
+  "window_m": 400.0453739808506
+ },
+ "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\AMIGACarb_Yuc_Centro_GLAS_Apr2013_l0s448.las",
+ "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_Glas\\Centro_Glas\\Centro_GLAS_l0s448_DEM_0p5m_v1.tif",
+ "clipped_las": "C:\\Replicalm\\tests\\dense_hunt\\l0s448_clip.las",
+ "clipped_reference": "C:\\Replicalm\\tests\\dense_hunt\\l0s448_reference.tif",
+ "points": 3797240
+}

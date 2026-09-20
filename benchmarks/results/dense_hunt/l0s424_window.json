@@ -1,0 +1,18 @@
+{
+ "tile": "l0s424",
+ "region": "Yuc_Out_Yuc",
+ "window": {
+  "minx": 466152.2945797528,
+  "maxy": 2350858.558554909,
+  "maxx": 466552.2616191878,
+  "miny": 2350458.591515474,
+  "cell": 0.4999587992937095,
+  "coverage": 0.9007984375,
+  "window_m": 399.9670394349676
+ },
+ "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Out_Yuc\\Out_Yuc_NFI\\Out_Yuc_NFI\\AMIGACarb_Out_of_the_Yuc_NFI_May2013_l0s424.las",
+ "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Out_Yuc\\Out_Yuc_NFI\\Out_Yuc_NFI\\OutYuc_NFI_l0s424_DEM_0p5m_v1.tif",
+ "clipped_las": "C:\\Replicalm\\tests\\dense_hunt\\l0s424_clip.las",
+ "clipped_reference": "C:\\Replicalm\\tests\\dense_hunt\\l0s424_reference.tif",
+ "points": 1835838
+}

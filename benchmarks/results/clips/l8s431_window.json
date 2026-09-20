@@ -1,0 +1,18 @@
+{
+ "tile": "l8s431",
+ "region": "Yuc_Centro",
+ "window": {
+  "minx": 311719.47763486,
+  "maxy": 2153034.218861883,
+  "maxx": 312119.48226127686,
+  "miny": 2152634.214235466,
+  "cell": 0.5000057830210488,
+  "coverage": 0.94850625,
+  "window_m": 400.0046264168391
+ },
+ "source_las": "D:\\GLiHT_LAS_orig\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\AMIGACarb_Yuc_Centro_NFI_Apr2013_l8s431.las",
+ "source_dem": "D:\\_Archive_EdgeFixed\\Yuc_Centro\\Centro_NFI\\Centro_NFI\\Centro_NFI_l8s431_DEM_0p5m_v1.tif",
+ "clipped_las": "C:\\Replicalm\\tests\\clips\\l8s431_clip.las",
+ "clipped_reference": "C:\\Replicalm\\tests\\clips\\l8s431_reference.tif",
+ "points": 1160361
+}
