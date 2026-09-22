@@ -132,3 +132,126 @@ filters off, the tightened threshold — was chosen where the alternatives are
 indistinguishable. Any conclusion in this project dated before 2026-09-20 and
 derived from a coverage-selected window should be treated as untested rather
 than as established. That includes the point-density and thinning results.
+
+---
+
+## 6. The flat-ground speckle is residual vegetation, and only partly removable
+
+**Status:** diagnosed, partly fixed by `cleanup.clear()`, gap quantified.
+
+**What it is.** Dark specks on otherwise flat ground, absent from the reference.
+Median cluster size one cell. Our surface sits above the reference at 78.9% of
+them, by a median of 2.6 cm, and local roughness there is 0.0768 m against the
+reference's 0.0358 m.
+
+**What they are made of.** Each speck carries a median of five classified ground
+returns. They sit 5.8 cm above the surrounding 3 m median, 76.2% positive — a
+one-sided bias, so not ranging noise, which would be symmetric. But they scatter
+among themselves by 8.8 cm, more than the feature they describe. Where two
+source chunks both contribute they disagree by 0.47 m against 0.11 m on control
+ground. Mean scan angle is identical to control (11.5 against 11.2 degrees), so
+incidence geometry is ruled out, and the returns are 11% darker.
+
+Something intercepts pulses at variable heights regardless of viewing angle and
+reflects less than soil or limestone. Low vegetation does exactly that. The
+hypothesis is Ben's; the measurements above were taken to test it and did not
+refute it.
+
+**The ceiling.** The delivered clouds carry TerraScan's own classification. At
+speck cells 12.2% of our ground returns are unclassified there, against 0.8% on
+control ground. Removing exactly those — 3.88% of returns — gives roughness
+1.00x the reference, specks down 94%, RMSE 5.9x better. So it is wholly a
+classification residue.
+
+**What is open.** `cleanup.clear()` recovers 92.5% of that by removing 17.75% of
+ground returns where the oracle removes 3.88%. The collateral softens platform
+edges. Closing the 14-point gap needs a discriminator that separates clutter
+from small real features, and the ones tried do not.
+
+---
+
+## 7. Three clutter rules that do not work
+
+**Status:** closed negative. Kept so they are not re-derived. Code in
+`cleanup.py`.
+
+| rule | synthetic brush | synthetic rock | real specks | real steep ground |
+|---|---|---|---|---|
+| height above patch floor | 72% removed | 100% removed | — | — |
+| spread, slope-compensated | 54% | 92% | — | — |
+| source disagreement | — | — | 3.4% hit | 10.2% hit |
+
+The first two destroy a 0.4 m rock as readily as a 0.4 m bush: a feature
+narrower than the patch has neighbours on the flat ground around it, so the
+local floor stays low and the whole feature reads as high. The third damages
+architecture three times harder than it cleans flat ground, because on a slope
+two source chunks sample different parts of the same real surface.
+
+At four ground returns per square metre a bush and a rock of the same footprint
+are each described by about five points with the same geometry. The statistical
+signal is real; it is not available per point.
+
+**Note on method.** The synthetic test that condemned height-above-floor used a
+0.4 m feature against a 0.6 m radius -- the pathological case. On real data at a
+0.75 m patch it is the best discriminator available, d-prime 1.82, and is what
+`clear()` uses. A synthetic test can be unrepresentative in either direction.
+
+---
+
+## 8. A nugget suppresses the specks by blurring them, and is the wrong fix
+
+**Status:** closed. `fit_variogram(min_nugget_fraction=)` exists, defaults to
+0.0, and is not used by the baseline.
+
+Fitted nuggets come back at exactly zero on 34 of 60 fits across ten tiles,
+making ordinary kriging an exact interpolator, so per-return noise passes into
+the raster. Flooring the nugget smooths it away:
+
+    0%  1.26x    2%  1.09x    4%  0.99x    6%  0.92x   20%  0.72x
+    1%  1.16x    3%  1.04x    5%  0.96x   10%  0.83x
+
+4% of sill matches the reference's flat-ground roughness. Measurement noise
+alone justifies about 0.6%, so matching the reference means smoothing roughly
+seven times harder than noise suppression requires. What produced the
+reference's texture is not documented and is not established here; what is
+established is that tuning to match it blurs real micro-relief. And the
+classification fix reaches RMSE 0.0140 where the nugget reaches 0.0679.
+
+**A measurement trap worth remembering.** Speck counts across nugget arms were
+not comparable: G1 normalises each raster by its own extremes, and one outlier
+sky-view-factor cell in the 5% arm restretched the whole image, making it look
+44% better. Two arms were scored on a different tonal mapping than their
+neighbours before this was caught.
+
+---
+
+## 9. The resolution knee sits at the mean point spacing
+
+**Status:** measured on one window at one density. Implemented as
+`grid.cell_for_density`.
+
+Rasterised block cross-validation on the Pixoyal window at 4.74 ground returns
+per square metre, mean spacing 0.46 m. Residual between the raster and returns
+that did not build it:
+
+| cell | median | marginal gain | cost vs 0.50 m |
+|---|---:|---:|---:|
+| 1.00 m | 0.0865 | — | 0.25x |
+| 0.50 m | 0.0803 | -7.2% | 1.0x |
+| 0.33 m | 0.0787 | -2.0% | 2.3x |
+| 0.25 m | 0.0781 | -0.8% | 3.9x |
+
+The curve turns at the mean point spacing. NCALM's 0.5 m suits this density
+rather than being arbitrary, and the suspicion that it was costing detail was
+wrong.
+
+**What is open.** One density, one window. That the knee sits at the mean
+spacing is physically sensible and is one measurement, not a law. Denser and
+sparser tiles would test whether the knee moves as `1/sqrt(density)` predicts.
+
+**Two metrics that could not answer this, and why.** `buffered_loo` predicts
+point to point and never touches the raster, so it returned identical figures at
+every cell size. Returns-below-surface improves as cells shrink for a reason
+unrelated to quality: a coarse cell averages over more ground, so returns at the
+low end fall beneath its single value. Both are sound for comparing
+classifications and useless for comparing resolutions.

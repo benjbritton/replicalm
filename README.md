@@ -12,11 +12,12 @@ The published method depends on TerraScan, ArcGIS Pro, Golden Surfer and paid
 LAStools modules. Without those licenses the results cannot be reproduced and
 the method cannot be applied to new surveys. This closes that gap.
 
-![Archive output, a flat-calibrated configuration, and the locked baseline](docs/figures/fig1_flank_artifact.png)
+![The Pixoyal group: original workflow, baseline, and Clear](docs/figures/fig10_clear_vs_baseline.png)
 
-*Left: the reference surface from the original commercial workflow. Center: a
-configuration tuned on flat sample windows. Right: the locked baseline. Same
-point cloud, same 0.5 m grid, same visualization recipe.*
+*The Pixoyal group, South_GLAS_l0s395. Left: the original commercial workflow.
+Center: Replicalm's locked baseline — note the speckle on the plaza floors.
+Right: Replicalm with Clear. Same point cloud, same visualization recipe, all
+three normalized over the same extent.*
 
 ---
 
@@ -42,7 +43,52 @@ difficult cells.
 
 ![Error concentrates on steep ground](docs/figures/fig3_error_by_slope.png)
 
+## Clear: removing residual vegetation
+
+The baseline surface carries a fine speckle on flat ground that the reference
+does not — dark specks where scrub or root mass stopped the pulse above the soil
+and the ground filter accepted the return anyway. They read as clutter in the
+image, and clutter on a plaza floor is exactly what an archaeologist does not
+want to have to discount by eye.
+
+The delivered clouds carry TerraScan's own classification, which supplies a
+label. At speck cells, 12.2% of our ground returns are unclassified there
+against 0.8% on control ground. Removing exactly those — 3.88% of returns —
+takes flat-ground roughness to 1.00× the reference, cuts specks by 94% and
+improves RMSE 5.9×. That is the ceiling any fix could reach.
+
+`cleanup.clear()` reaches most of it without TerraScan: demote a ground return
+standing more than 0.20 m above the tenth percentile within 0.75 m.
+
+| measure | baseline | Clear |
+|---|---:|---:|
+| predicts held-out ground returns (MAE) | 0.0492 m | **0.0429 m** |
+| returns left below the surface | 8.11% | **4.80%** |
+| flat-ground roughness vs reference | 1.26× | **0.99×** |
+| error above 20° | 1.86% | **0.29%** |
+
+The first two rows do not reference the archive at all. They ask how well the
+surface predicts real measurements it never saw, and whether it floats above
+returns that reached lower — a pulse can be stopped early by vegetation but
+cannot arrive below the soil. See `src/replicalm/evaluate.py`.
+
+![Pixoyal: the original workflow and Clear](docs/figures/fig9_pixoyal_ncalm_vs_replicalm.png)
+
+*The Pixoyal group. Left: the original commercial workflow. Right: Replicalm
+with Clear. Same point cloud, same visualization recipe, both normalized over
+the same extent.*
+
+Clear removes 17.75% of ground returns where the oracle removes 3.88%, and that
+collateral softens platform edges slightly. **It is available but is not in the
+locked baseline** — adopting it is a deliberate change, not a default.
+
 ## The finding that shaped this project
+
+![Archive output, a flat-calibrated configuration, and the locked baseline](docs/figures/fig1_flank_artifact.png)
+
+*Left: the reference surface. Center: a configuration tuned on flat sample
+windows — the beaded necklaces along the mound flanks are not in the data.
+Right: the locked baseline.*
 
 The pipeline scored well and still produced a visible artifact on mound flanks.
 The parameters were not at fault — the sample windows were. The window selector
@@ -82,10 +128,10 @@ pip install rvt-py        # only for the G1 image step
 ```
 
 ```bash
-# DEM only
+# DEM only; cell size derived from the measured ground-return density
 python -m replicalm.pipeline tile.las -o out/
 
-# DEM and the G1 image
+# DEM and the G1 image, with the cell size set explicitly
 python -m replicalm.pipeline tile.las -o out/ --g1 --cell 0.5
 ```
 
@@ -136,10 +182,9 @@ compiled, which needs Inno Setup 6 on the build machine. See
 
 ## Relation to the published method
 
-**Carried over unchanged:** 1 km tiles with 10 m buffers, the −0.5 m / 600 m
-height-above-ground cuts, the ±0.2 m class 8 near-ground band, ground-only
-export, LAS 1.2 output, a 20 m kriging search radius as the maximum, a 1 m
-output grid.
+**Carried over unchanged:** the −0.5 m / 600 m height-above-ground cuts, the
+±0.2 m class 8 near-ground band, ground-only export, LAS 1.2 output, and a 20 m
+kriging search radius as the maximum.
 
 **Translated, not ported:** the ground classification. TerraScan's progressive
 TIN densification (Axelsson 2000) is not implemented by any free tool, and its
@@ -152,7 +197,53 @@ elevation tolerance instead of 3 m; a declared output grid on whole multiples of
 the cell size, so neighboring tiles mosaic without resampling; and reduced
 noise filtering. Each departure carries the measurement behind it.
 
+Two further settings are about the machine rather than the method, and are
+covered under [Setup options](#setup-options) below.
+
 Detail: [docs/processing_report.md](docs/processing_report.md)
+
+## Setup options
+
+Two settings decide how the work is divided up rather than what is done to the
+data. Both have defaults that suit a workstation with plenty of memory.
+
+**Tiling.** The source works in 1 km tiles with 10 m buffers because a whole
+transect will not fit in RAM on modest hardware. Kriging now chunks its neighbor
+query internally, so tiling is no longer needed for interpolation and `tile_km`
+defaults to `None` — the whole extent at once. Set it to `1.0` where
+classification memory still demands it, since PDAL holds the cloud and its own
+working grids while SMRF runs.
+
+**Output cell size.** Derived from measured ground-return density rather than
+fixed: `1/√density`, which gives 0.49 m on `l0s395` against the source's 1 m
+product. Pass `--cell` on the command line, or `cell_m=` in Python, to set it
+directly.
+
+### Changing them
+
+Defaults live in `src/replicalm/config.py`. To change a run without editing the
+package, write the configuration out, edit the JSON, and load it back:
+
+```python
+import config
+config.load().to_json("myrun.json")     # write the current defaults
+```
+
+Edit `myrun.json` — for instance `"tile_km": 1.0`, `"chunk_cells": 250000`, or
+`"remove_outliers": false` — then run with it:
+
+```python
+from replicalm import pipeline
+from replicalm.config import ReplicalmConfig
+
+cfg = ReplicalmConfig.from_json("myrun.json")
+pipeline.process("tile.las", "out/", cfg=cfg)
+```
+
+Every run writes `<tile>_config.json` beside its DEM recording exactly what was
+used, so any result can be traced back to the settings that produced it. A run
+whose configuration differs from the locked baseline says so in its log rather
+than failing silently.
 
 ## Layout
 
@@ -161,9 +252,11 @@ README.md               this file
 config.py               baseline enforcement and configuration defaults
 src/replicalm/          the processing modules
   pipeline.py           one tile end to end; what the CLI and GUI both call
+  cleanup.py            the Clear rule, and the rules that failed
+  evaluate.py           judging a surface against the cloud, no reference DEM
 docs/
   processing_report.md  plain-language description and parameter audit
-  open_observations.md  measured but unexplained; five open items
+  open_observations.md  measured but unexplained; nine entries
   posts/                technical write-ups
   figures/
 benchmarks/             the calibration and validation harness
@@ -175,7 +268,7 @@ archive/                superseded renders and experiments (not tracked)
 
 ## What is not settled
 
-Five items are recorded in [docs/open_observations.md](docs/open_observations.md)
+Nine items are recorded in [docs/open_observations.md](docs/open_observations.md)
 rather than smoothed over. The largest: one comparison on a steep window
 produced a 2× difference in RMSE that no isolated variable has yet accounted
 for. It was attributed twice and both attributions were wrong.
