@@ -302,7 +302,7 @@ system and no vendor-proprietary content. A progress bar
 indicates how far along the run is, and a message window reports the details of
 the processing as it happens.
 
-`Replicalm-1.0.0-setup.exe` is 1.15 GB and takes about 4 GB installed. It carries its own
+`Replicalm-1.0.0-setup.exe` is 1.13 GB and takes about 4 GB installed. It carries its own
 copies of Python, PDAL, GDAL and PROJ, so nothing needs to be installed or
 configured on the target machine beforehand, and it cannot collide with software
 already there. Both the installer and the program it installs have been run and
@@ -312,7 +312,7 @@ produce correct output.
 
 ***Replicalm v1.0 installer***
 
-`Replicalm-1.0.0-setup.exe` is a standard Windows installer, 1,180,522 KB,
+`Replicalm-1.0.0-setup.exe` is a standard Windows installer, 1,182,812 KB,
 compatible with 64-bit Windows 10 and 11. It needs no prerequisites: Python and
 the geospatial libraries travel inside it. The MIT license is presented for
 acceptance at the second step, and the third-party components — PDAL, GDAL,
