@@ -46,3 +46,6 @@ desktop.ini
 packaging/stage/
 packaging/dist/
 packaging/*.log
+
+# Word lock files
+~$*

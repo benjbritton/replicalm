@@ -38,22 +38,43 @@ $root  = Split-Path -Parent $here
 $stage = Join-Path $here "stage"
 
 function Step($n, $text) { Write-Host "`n[$n] $text" -ForegroundColor Cyan }
+
+# Resolve a tool without requiring an activated conda shell. conda-pack lives in
+# the base environment's Scripts directory, which is only on PATH inside an
+# Anaconda Prompt; a plain PowerShell session will not see it, and failing there
+# tells the user to install something they already have.
 function Need($exe, $hint) {
     $c = Get-Command $exe -ErrorAction SilentlyContinue
-    if (-not $c) { throw "$exe not found on PATH. $hint" }
-    return $c.Source
+    if ($c) { return $c.Source }
+    $roots = @()
+    $conda = Get-Command conda -ErrorAction SilentlyContinue
+    if ($conda) { $roots += Split-Path -Parent $conda.Source }
+    if ($env:CONDA_PREFIX) { $roots += (Join-Path $env:CONDA_PREFIX "Scripts") }
+    $roots += @("$env:USERPROFILE\anaconda3\Scripts",
+                "$env:USERPROFILE\miniconda3\Scripts",
+                "$env:USERPROFILE\Anaconda3\Scripts",
+                "$env:LOCALAPPDATA\Continuum\anaconda3\Scripts",
+                "C:\ProgramData\anaconda3\Scripts",
+                "C:\ProgramData\miniconda3\Scripts")
+    foreach ($r in ($roots | Where-Object { $_ } | Select-Object -Unique)) {
+        foreach ($ext in @(".exe", ".bat", "")) {
+            $p = Join-Path $r ($exe + $ext)
+            if (Test-Path $p) { return $p }
+        }
+    }
+    throw "$exe not found on PATH or beside conda. $hint"
 }
 
 # --- 1: the environment ----------------------------------------------------
 if (-not $SkipEnv) {
     Step 1 "Creating the pinned conda environment '$EnvName'"
-    Need "conda" "Install Miniconda, or run this from an Anaconda Prompt." | Out-Null
-    $exists = (conda env list) -match "^\s*$EnvName\s"
+    $conda = Need "conda" "Install Miniconda, or run this from an Anaconda Prompt."
+    $exists = (& $conda env list) -match "^\s*$EnvName\s"
     if ($exists) {
         Write-Host "    environment exists; updating to match environment.yml"
-        conda env update -n $EnvName -f (Join-Path $here "environment.yml") --prune
+        & $conda env update -n $EnvName -f (Join-Path $here "environment.yml") --prune
     } else {
-        conda env create -n $EnvName -f (Join-Path $here "environment.yml")
+        & $conda env create -n $EnvName -f (Join-Path $here "environment.yml")
     }
     if ($LASTEXITCODE -ne 0) { throw "conda env creation failed" }
 } else {
@@ -62,12 +83,23 @@ if (-not $SkipEnv) {
 
 # --- 2: pack it ------------------------------------------------------------
 Step 2 "Packing the environment"
-Need "conda-pack" "conda install -n base -c conda-forge conda-pack" | Out-Null
+$condaPack = Need "conda-pack" "conda install -n base -c conda-forge conda-pack"
+Write-Host "    using $condaPack"
 $envDir = Join-Path $stage "env"
 if (Test-Path $envDir) { Remove-Item $envDir -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $envDir | Out-Null
-conda-pack -n $EnvName --format no-archive --output $envDir --force
+
+# conda-pack always writes an archive; there is no option to emit a directory.
+# Installers need the tree, so it is packed and then expanded. ZipFile is used
+# rather than Expand-Archive because the latter is very slow at this size.
+$zip = Join-Path $stage "env.zip"
+if (Test-Path $zip) { Remove-Item $zip -Force }
+& $condaPack -n $EnvName --output $zip --force
 if ($LASTEXITCODE -ne 0) { throw "conda-pack failed" }
+Write-Host ("    archive: {0:N0} MB, expanding" -f ((Get-Item $zip).Length / 1MB))
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $envDir)
+Remove-Item $zip -Force
 
 $unpack = Join-Path $envDir "Scripts\conda-unpack.exe"
 if (-not (Test-Path $unpack)) {
@@ -131,14 +163,30 @@ if ($SkipInstaller) {
     exit 0
 }
 Step 4 "Building the installer"
-$iscc = @(
+# winget installs Inno Setup per-user by default, which is not under Program
+# Files, so the registry is consulted as well as the usual locations.
+$isccCandidates = @(
     "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-    "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $iscc) {
-    throw "Inno Setup 6 not found. Install from https://jrsoftware.org/isdl.php, " +
-          "or re-run with -SkipInstaller to stop after staging."
+    "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+)
+foreach ($hive in @(
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall")) {
+    Get-ChildItem -Path $hive -ErrorAction SilentlyContinue | ForEach-Object {
+        $prop = Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue
+        if ($prop.DisplayName -like "*Inno Setup*" -and $prop.InstallLocation) {
+            $isccCandidates += (Join-Path $prop.InstallLocation "ISCC.exe")
+        }
+    }
 }
+$iscc = $isccCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+if (-not $iscc) {
+    throw "Inno Setup 6 not found. Install it (winget install --id " +
+          "JRSoftware.InnoSetup -e), or re-run with -SkipInstaller."
+}
+Write-Host "    using $iscc"
 & $iscc "/DAppVersion=$Version" (Join-Path $here "replicalm.iss")
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
 

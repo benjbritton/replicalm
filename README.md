@@ -8,9 +8,10 @@ read. It follows the NCALM workflow described in the Estrada-Belli et al. 2025
 supplementary material, using only PDAL, GDAL, NumPy and SciPy — plus the Relief
 Visualization Toolbox for the optional image step.
 
-The published method depends on TerraScan, ArcGIS Pro, Golden Surfer and paid
-LAStools modules. Without those licenses the results cannot be reproduced and
-the method cannot be applied to new surveys. This closes that gap.
+The published method depends on two commercial products: TerraScan for ground
+classification, and Golden Surfer for interpolation and rasterization. Without
+those licenses the results cannot be reproduced and the method cannot be applied
+to new surveys. This closes that gap.
 
 ![The Pixoyal group: original workflow, baseline, and Clear](docs/figures/fig10_clear_vs_baseline.png)
 
@@ -81,6 +82,39 @@ the same extent.*
 Clear removes 17.75% of ground returns where the oracle removes 3.88%, and that
 collateral softens platform edges slightly. **It is available but is not in the
 locked baseline** — adopting it is a deliberate change, not a default.
+
+## Deep: matching the grid to the data
+
+`Deep` is `Clear` plus a cell size derived from the survey's own point density
+rather than fixed in advance — `1/√density`, which gives 0.33 m where ground
+returns average one every 0.46 m, and a coarser or finer grid on sparser or
+denser surveys.
+
+Its target is different from the baseline's. Baseline and `Clear` are aimed at
+replication and are scored against the commercial output. `Deep` is aimed at
+getting the most from the point cloud and is scored against the returns
+themselves. A configuration optimized for one will score differently under the
+other by construction, so the two are not directly comparable as better or
+worse. Which is the better representation of the ground needs ground truth —
+surveyed control points or excavated profiles — that neither workflow has here.
+
+Measured with the grid inside the test (whole blocks of returns withheld, the
+surface built without them, then sampled where those returns are):
+
+| cell | median residual | marginal gain | cost vs 0.50 m |
+|---|---:|---:|---:|
+| 1.00 m | 0.0872 m | — | 0.25× |
+| 0.50 m | 0.0803 m | −7.2% | 1.0× |
+| **0.33 m** | **0.0787 m** | **−2.0%** | 2.3× |
+| 0.25 m | 0.0781 m | −0.8% | 3.9× |
+
+The curve turns at the mean point spacing, which is where `cell_for_density`
+puts it. Below that, finer grids buy rendering rather than measurement —
+slope and sky-view factor computed without stair-stepping at cell boundaries.
+
+**Deep is an early result**: one window of one tile, and a cell-size rule
+resting on a single density measurement. `Clear` was validated on three windows
+it was not developed against; `Deep` has had none.
 
 ## The finding that shaped this project
 
@@ -162,10 +196,12 @@ needs nothing preinstalled on the target machine.
 
 The launcher holds no processing logic — every decision lives in
 `replicalm.pipeline`, so anything done through the window is reproducible from
-the command line. **Status:** environment pins verified to solve and build,
-launcher and build script written; the installer itself has not yet been
-compiled, which needs Inno Setup 6 on the build machine. See
-[packaging/README.md](packaging/README.md).
+the command line.
+
+**Built:** `packaging\dist\Replicalm-1.0.0-setup.exe`, 1.15 GB, roughly 4 GB
+installed. The staged build is tested end to end — it processes a tile and
+writes a correctly projected raster from its own bundled PDAL, GDAL and PROJ.
+Rebuild with `.uild.ps1`; see [packaging/README.md](packaging/README.md).
 
 ## The locked baseline
 

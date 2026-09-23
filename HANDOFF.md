@@ -38,15 +38,21 @@ this note and the code disagree, the code is right.
 **Clear** — validated on three windows it was not fitted to. Deliberately not in
 the baseline; promoting it is a decision rather than a default.
 
-**Deep** — the measurement apparatus exists and has produced one result: the
-resolution knee sits at the mean point spacing, so `cell ≈ 1/√density`. No Deep
-product has been built.
+**Deep** — built and measured on one window of one tile. It is Clear plus a cell
+size derived from point density: the resolution knee sits at the mean point
+spacing, so `cell ≈ 1/√density`, giving 0.33 m at 4.74 returns per m². On the
+rasterised fold test it improves the median residual 2.0% over Clear. One window
+and one density; the rule wants measuring on a survey of different density
+before it is trusted there.
 
 ## Next steps
 
 1. Decide whether to promote `Clear` into the baseline.
-2. Compile the Windows installer — needs Inno Setup 6 on the build machine.
-3. The trench-window result, `open_observations.md` item 1, remains unexplained;
+2. Test `packaging/dist/Replicalm-1.0.0-setup.exe` on a machine that has none of
+   the dependencies. The staged build is proven; the install sequence, the
+   `conda-unpack` step it runs, and the shortcuts are not.
+3. Validate Deep on tiles of different point density.
+4. The trench-window result, `open_observations.md` item 1, remains unexplained;
    the SMRF `slope` sweep that would settle it has not been run.
 
 ## Not yet published

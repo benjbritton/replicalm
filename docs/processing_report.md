@@ -17,7 +17,8 @@ the G-LiHT surveys of the Maya lowlands, but using only software that is free
 and open.
 
 The reason for building it is simple. The published method depends on commercial
-software — TerraScan, ArcGIS Pro, Golden Surfer, LAStools. If you do not have
+software — TerraScan for the classification, Golden Surfer for the
+interpolation and rasterization. If you do not have
 those licenses, you cannot reproduce the published results, and you cannot apply
 the same processing to new data. Replicalm is an attempt to close that gap.
 
@@ -26,10 +27,11 @@ the same processing to new data. Replicalm is an attempt to close that gap.
 You give it a point cloud and it gives you back a ground surface. In between it
 does five things:
 
-1. **Cuts the survey into manageable pieces.** Lidar tiles are large — a single
-   G-LiHT tile can be two gigabytes. The work is done in one-kilometer blocks
-   with a ten-meter overlap, so that nothing at a block edge is processed
-   without its surroundings.
+1. **Reads the survey.** Lidar tiles are large — a single G-LiHT tile can be two
+   gigabytes. Replicalm processes a whole tile at once on a machine with the
+   memory for it, and can fall back to one-kilometer blocks with a ten-meter
+   overlap where memory is short. That choice changes nothing about the result;
+   it only changes how the work is divided.
 
 2. **Sorts the returns into ground and not-ground.** This is the hard part. Each
    laser pulse may bounce off a leaf, a branch, a rooftop, and finally the soil.
@@ -72,6 +74,39 @@ does five things:
    Table 3 of Britton et al. 2025. Replicalm calls that recipe rather than
    copying it, so there is only one definition of it and this software cannot
    drift away from it.
+
+## Three ways to run it
+
+The same pipeline runs in three forms.
+
+**Baseline** follows the published method as closely as the translation allows.
+It is what the software does unless told otherwise, and what everything else is
+measured against.
+
+**Clear** adds one step. Some laser pulses stop on low vegetation — scrub,
+brush, a root mass — instead of reaching the soil, and the ground filter accepts
+them. In the elevation model they become small bumps a few centimeters high, and
+in the shaded image they appear as a fine speckle across otherwise flat ground:
+clutter that an archaeologist has to learn to discount. Clear removes returns
+that stand more than 20 cm above the ground immediately around them, which
+catches most of that vegetation. It also removes some genuine ground with it, so
+the edges of platforms come out very slightly softer.
+
+**Deep** takes Clear and sets the map's cell size from the survey's own point
+spacing instead of fixing it in advance. Where ground returns average one every
+half meter, a third-of-a-meter cell resolves what the data holds; a sparser
+survey gets a coarser grid and a denser one a finer grid. Deep is aimed at
+getting the most out of a given point cloud rather than at matching what the
+commercial workflow produced — a different goal, not a better score at the same
+one.
+
+![The same ground under four treatments](figures/fig11_four_way_pixoyal.png)
+
+*The Pixoyal group. From left: the original commercial workflow; Replicalm's
+baseline, where the speckle on the open ground is vegetation the filter let
+through; Clear, with it removed; and Deep, on a finer grid. The four have been
+matched for overall brightness so the comparison is about what they show rather
+than how light they are.*
 
 ## What you get
 
@@ -122,14 +157,13 @@ Three ways, all doing the same work:
 
 The desktop version is packaged as an installer carrying its own copy of Python
 and the geospatial libraries, so nothing needs to be installed or configured
-first and it cannot collide with other software on the machine. That costs about
-a gigabyte on disk and buys a program that runs on a machine where nothing has
-been set up. It is assembled but has not yet been compiled into a finished
-installer, which needs one more free tool on the build machine. The window
-itself, and everything behind it, work today.
+first and it cannot collide with other software already on the machine. That
+costs about four gigabytes on disk and buys a program that runs where nothing
+has been set up. The packaged build has been tested end to end: it processes a
+tile and writes a correctly projected elevation model using only its own bundled
+components.
 
-Nothing in the chain needs TerraScan, ArcGIS Pro, Surfer, or the paid LAStools
-modules.
+Nothing in the chain needs TerraScan or Surfer.
 
 ## How it compares to the published method
 
@@ -138,13 +172,11 @@ modules.
 The overall shape of the workflow is the same, and several numbers are taken
 directly from the source and not changed:
 
-- one-kilometer processing tiles with ten-meter buffers
 - height-above-ground limits of −0.5 m and 600 m
 - the near-ground band of ±0.2 m, written to class 8
 - exporting only the ground and near-ground classes
 - LAS version 1.2 output
 - a twenty-meter kriging search radius as the maximum
-- a one-meter output grid as the standard product
 
 ### What is similar but not identical
 
