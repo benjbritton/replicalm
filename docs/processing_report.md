@@ -77,11 +77,13 @@ does five things:
 
 ## Three ways to run it
 
-The same pipeline runs in three forms.
+The same pipeline runs in three forms. The application offers all three and
+runs Clear unless told otherwise.
 
 **Baseline** follows the published method as closely as the translation allows.
-It is what the software does unless told otherwise, and what everything else is
-measured against.
+It is what everything else is measured against, and it stays selectable because
+Clear's threshold was fitted on one campaign's labels: on terrain where that has
+not been checked, Baseline is the setting that assumes nothing.
 
 **Clear** adds one step. Some laser pulses stop on low vegetation — scrub,
 brush, a root mass — instead of reaching the soil, and the ground filter accepts

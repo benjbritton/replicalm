@@ -35,13 +35,17 @@ this note and the code disagree, the code is right.
 
 ## Active tracks
 
-**Clear** — validated on three windows it was not fitted to. Deliberately not in
-the baseline; promoting it is a decision rather than a default.
+**Clear** — validated on three windows it was not fitted to. Now the
+application's default method, selectable against Baseline and Deep. The locked
+`BASELINE` dict carries `clean_vegetation: True` as of the 2026-09-23 relock,
+so drift detection covers it; the `baseline` preset turns it off.
 
-**Deep** — built and measured on one window of one tile. It is Clear plus a cell
-size derived from point density: the resolution knee sits at the mean point
-spacing, so `cell ≈ 1/√density`, giving 0.33 m at 4.74 returns per m². On the
-rasterised fold test it improves the median residual 2.0% over Clear. One window
+**Deep** — built and measured on one window of one tile. Density-derived cell
+size (`cell ≈ 1/√density`, the resolution knee sitting at mean point spacing)
+became the default for all three, so Deep is now defined by `cell_factor=0.7`:
+deliberate oversampling to about 1.4x finer than that spacing, 0.34 m at 4.3
+returns per m². On the rasterised fold test it improves the median residual 2.0%
+over Clear, which is rendering quality rather than accuracy. One window
 and one density; the rule wants measuring on a survey of different density
 before it is trusted there.
 
