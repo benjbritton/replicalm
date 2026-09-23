@@ -80,11 +80,14 @@ surface.
 ## Three configurations
 
 The same pipeline runs in three forms, which differ in how hard they work at
-removing what is not ground and at matching the grid to the data.
+removing what is not ground and at matching the grid to the data. The
+application offers all three and runs Clear unless told otherwise.
 
 **Baseline** reproduces the source method as closely as the translation allows.
-It is the configuration against which everything else is measured, and it is
-what the software runs unless told otherwise.
+It is the configuration against which everything else is measured. It remains
+selectable because the cleanup step that distinguishes Clear was fitted against
+one survey campaign's labels, and Baseline is the setting that assumes nothing
+about how far that threshold travels.
 
 **Clear** adds one step: it removes ground returns that stand more than 0.20 m
 above the local ground surface. These are overwhelmingly low vegetation — scrub,
@@ -92,12 +95,16 @@ brush, root mass — that stopped the laser pulse before it reached the soil. In
 the baseline they survive into the elevation model and appear in the image as a
 fine speckle across otherwise flat ground.
 
-**Deep** takes Clear and adds a cell size derived from the survey's own point
-density rather than fixed in advance. Where ground returns average one every
-0.46 m, as they do here, a 0.33 m cell resolves what the data contains; on a
-sparser survey the same rule produces a coarser grid, and on a denser one a
-finer grid. Deep is aimed at getting the most out of a given point cloud rather
-than at matching what the commercial workflow produced.
+**Deep** takes Clear and deliberately oversamples: a grid about 1.4 times finer
+than the mean spacing between ground returns. Deriving the cell from measured
+density is no longer what distinguishes it — that became the default for all
+three, since a cell fixed in advance is only correct for one survey's density.
+What Deep adds is resolution beyond what the returns independently support.
+That buys rendering rather than measurement: slope and sky-view factor computed
+without stair-stepping at cell boundaries, for a 2.0% gain in rasterized fold
+residual at roughly twice the compute and file size. Deep is aimed at getting
+the most out of a given point cloud rather than at matching what the commercial
+workflow produced.
 
 ---
 
@@ -287,9 +294,11 @@ rule is trusted on it.
 
 A Windows installer, `Replicalm-1.0.0-setup.exe`, installs a Windows
 executable with user selections for the point cloud to be processed, the output
-folder, the cell size
-in meters per pixel, an optional suite of RVT-based visualizations, and optional
-retention of the classified ground-filtered point cloud. A progress bar
+folder, the processing method — Clear, Baseline or Deep, described above, with
+Clear selected by default — the cell size in meters per pixel, an optional suite
+of RVT-based visualizations, and optional retention of the classified
+ground-filtered point cloud as a compressed LAS 1.4 file carrying its coordinate
+system and no vendor-proprietary content. A progress bar
 indicates how far along the run is, and a message window reports the details of
 the processing as it happens.
 

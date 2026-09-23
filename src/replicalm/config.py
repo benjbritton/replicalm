@@ -211,8 +211,46 @@ class ReplicalmConfig:
     near_ground_band_m: tuple = NCALM_TERRASCAN["near_ground_band_m"]
     near_ground_class: int = NCALM_TERRASCAN["near_ground_class"]
 
+    # Residual low vegetation -- scrub, brush, root mass that stopped the pulse
+    # above the soil -- survives the ground filter and appears in the surface as
+    # a fine speckle on flat ground. Demoting returns that stand more than
+    # `clean_height_m` above the tenth percentile within `clean_patch_m`
+    # recovers 92.5% of what TerraScan rejected, takes flat-ground roughness
+    # from 1.26x the reference to 0.99x, and cuts error above twenty degrees
+    # from 1.86% to 0.29%. Validated on three windows it was not fitted to.
+    #
+    # It removes 17.75% of ground returns where TerraScan's own labels need only
+    # 3.88%, so it takes genuine returns with the clutter and platform edges come
+    # out slightly softer.
+    #
+    # THE THRESHOLD IS NOT UNIVERSAL. It was fitted against one tile's labels and
+    # validated on three more from the same G-LiHT campaign. A different sensor,
+    # flight height or vegetation regime may want a different figure. Set
+    # clean_vegetation False for the unfiltered surface, which is the pure
+    # translation of the source method and what the published comparison figures
+    # are measured against.
+    clean_vegetation: bool = True
+    clean_patch_m: float = 0.75
+    clean_height_m: float = 0.20
+    clean_percentile: float = 10.0
+
     # export, step 7
-    las_version: str = NCALM_TERRASCAN["output_las_version"]
+    #
+    # LAS 1.4 with point format 6, written as LAZ. The source specifies 1.2,
+    # which stores its coordinate system as GeoTIFF keys rather than WKT -- fine
+    # for UTM, lossy for anything less common -- and carries classification in
+    # five bits against 1.4's eight. LAZ costs nothing here and is five times
+    # smaller: 25.4 MB of LAS becomes 4.8 MB.
+    #
+    # `forward` is limited to scale and offset so that nothing else carries over
+    # from the input header. Clouds delivered from TerraScan bring proprietary
+    # Terrasolid records that inflate the file and mean nothing outside that
+    # software; those are dropped, and the coordinate system is written
+    # explicitly rather than forwarded.
+    las_version: str = "1.4"
+    las_point_format: int = 6
+    las_compression: bool = True
+    las_forward: str = "scale,offset"
     keep_classes: tuple = (2, 8)
 
     # interpolation, steps 8 and 9
@@ -245,6 +283,12 @@ class ReplicalmConfig:
     #
     # The source's documented 20 m is preserved in NCALM_TERRASCAN and is the
     # ceiling here, so nothing ever searches further than the method specifies.
+    # Below 1.0 the grid is deliberately finer than the point spacing. That
+    # buys rendering rather than measurement: slope and sky-view factor computed
+    # without stair-stepping at cell boundaries, for a 2.0% gain in rasterised
+    # fold residual and 2.3x the compute. The Deep profile sets it.
+    cell_factor: float = 1.0
+
     search_radius_m: float = None        # None scales it from ground density
     search_radius_mode: str = "density"  # density | variogram | fixed
     search_radius_factor: float = 4.0    # multiplier on the k-neighbour spacing
@@ -319,7 +363,7 @@ class ReplicalmConfig:
 # steep ground, and all three were wrong.
 
 BASELINE = {
-    "locked": "2026-09-20",
+    "locked": "2026-09-23",
     "algorithm": "smrf",
     "passes": 1,
     "slope": 0.1584,            # tan 9 deg, the source's pass-1 iteration angle
@@ -327,6 +371,9 @@ BASELINE = {
     "cell_m": 0.5,
     "remove_low_noise": False,  # ELM: inert on this data, 0.00% removed
     "remove_outliers": True,    # tile-dependent, see the note above
+    "clean_vegetation": True,   # the delivered method removes residual scrub
+    "clean_height_m": 0.20,
+    "clean_patch_m": 0.75,
     "search_radius_mode": "density",
     "search_radius_ceiling_m": 20.0,
     "max_points": 16,
@@ -351,7 +398,8 @@ def verify_baseline(cfg=None):
             if getattr(p, k) != BASELINE[k]:
                 bad.append("%s: %r, baseline %r"
                            % (k, getattr(p, k), BASELINE[k]))
-    for k in ("remove_low_noise", "remove_outliers", "search_radius_mode",
+    for k in ("remove_low_noise", "remove_outliers", "clean_vegetation",
+              "clean_height_m", "clean_patch_m", "search_radius_mode",
               "search_radius_ceiling_m", "max_points"):
         if getattr(cfg, k) != BASELINE[k]:
             bad.append("%s: %r, baseline %r" % (k, getattr(cfg, k), BASELINE[k]))
@@ -365,7 +413,20 @@ def verify_baseline(cfg=None):
 # translation is inexact and the right settings are terrain-dependent.
 
 PRESETS = {
+    # The delivered method: the translation, plus removal of the residual low
+    # vegetation the ground filter accepts. This is what the application runs.
     "ncalm": ReplicalmConfig(),
+    "clear": ReplicalmConfig(),
+
+    # The translation alone, with nothing removed beyond what the source method
+    # removes. This is what the published comparison figures are measured
+    # against, and the right choice on terrain where the cleanup threshold has
+    # not been checked.
+    "baseline": ReplicalmConfig(clean_vegetation=False),
+
+    # Clear on a grid finer than the point spacing. The extra resolution is for
+    # rendering, not for accuracy -- see cell_factor.
+    "deep": ReplicalmConfig(cell_factor=0.7),
     "ncalm_csf": ReplicalmConfig(passes=[
         GroundPass(algorithm="csf", csf_rigidness=2, csf_threshold_m=0.5,
                    stands_in_for="TerraScan pass 1, via cloth simulation"),

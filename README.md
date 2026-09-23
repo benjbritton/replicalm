@@ -83,12 +83,15 @@ Clear removes 17.75% of ground returns where the oracle removes 3.88%, and that
 collateral softens platform edges slightly. **It is available but is not in the
 locked baseline** — adopting it is a deliberate change, not a default.
 
-## Deep: matching the grid to the data
+## Deep: oversampling the grid
 
-`Deep` is `Clear` plus a cell size derived from the survey's own point density
-rather than fixed in advance — `1/√density`, which gives 0.33 m where ground
-returns average one every 0.46 m, and a coarser or finer grid on sparser or
-denser surveys.
+`Deep` is `Clear` on a grid about 1.4x finer than the mean ground-return
+spacing — 0.33 m where returns average one every 0.46 m. Deriving the cell from
+measured density (`1/√density`) is no longer what sets it apart; that is now the
+default for all three, a fixed cell being right for only one density. What
+`Deep` adds is resolution beyond what the returns independently support, which
+serves rendering rather than measurement: 2.0% better rasterized fold residual
+for roughly twice the compute.
 
 Its target is different from the baseline's. Baseline and `Clear` are aimed at
 replication and are scored against the commercial output. `Deep` is aimed at

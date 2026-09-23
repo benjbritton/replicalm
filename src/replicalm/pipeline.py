@@ -77,11 +77,29 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     cfg.to_json(os.path.join(out_dir, stem + "_config.json"))
 
     progress("classify", "classifying ground returns", 0.05)
-    ground_las = os.path.join(out_dir, stem + "_ground.las")
+    ground_las = os.path.join(out_dir, stem + "_ground.laz")
     classify.classify_tile(las_path, ground_las, cfg, verbose=False)
 
     arr, _ = classify.read_points(ground_las)
     gnd = arr[arr["Classification"] == 2]
+
+    # Residual low vegetation the ground filter accepted. Removing it is the
+    # delivered method; set clean_vegetation False for the unfiltered surface,
+    # which is the pure translation of the source and what the published
+    # comparison figures are measured against.
+    if getattr(cfg, "clean_vegetation", False) and len(gnd):
+        from . import cleanup
+        above = cleanup.height_above_floor(
+            gnd["X"].astype("f8"), gnd["Y"].astype("f8"),
+            gnd["Z"].astype("f8"),
+            patch=getattr(cfg, "clean_patch_m", 0.75),
+            percentile=getattr(cfg, "clean_percentile", 10.0))
+        keep = above <= getattr(cfg, "clean_height_m", 0.20)
+        progress("classify", "removed %d of %d ground returns (%.1f%%) standing "
+                             "above the ground around them"
+                 % ((~keep).sum(), len(keep), 100 * (~keep).mean()))
+        gnd = gnd[keep]
+
     if len(gnd) < cfg.min_ground_points:
         raise PipelineError(
             "only %d ground points; below min_ground_points (%d). Rasterising "
@@ -99,7 +117,8 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     # the first figure comes out nearly twice too coarse.
     density, covered = G.covered_density(x, y)
     if cell_m is None:
-        cell_m = G.cell_for_density(density)
+        cell_m = G.cell_for_density(density,
+                                    factor=getattr(cfg, 'cell_factor', 1.0))
         progress("interpolate",
                  "cell size %.2f m derived from %.2f returns per m2 over "
                  "%.2f km2 of covered ground"
@@ -219,7 +238,9 @@ def main(argv=None):
     p.add_argument("--g1", action="store_true", help="also build the G1 image")
     p.add_argument("--rvt-script", default=None,
                    help="path to GLiHT_rvt.py for the image step")
-    p.add_argument("--preset", default="ncalm", choices=sorted(PRESETS))
+    p.add_argument("--profile", "--preset", dest="preset",
+                   default="clear", choices=sorted(PRESETS),
+                   help="baseline | clear (default) | deep")
     a = p.parse_args(argv)
 
     def show(stage, message, fraction=None):

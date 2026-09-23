@@ -30,6 +30,15 @@ for candidate in (os.path.join(HERE, "src"),
 
 APP = "Replicalm"
 
+# The three methods, as the window names them: preset key and the one line
+# shown beside the selector. The descriptions are the whole explanation most
+# users will read, so they say what the choice does to the output, not how.
+PROFILES = {
+    "Clear":    ("clear",    "removes low vegetation the ground filter keeps"),
+    "Baseline": ("baseline", "the published method, nothing extra removed"),
+    "Deep":     ("deep",     "Clear on a finer grid; slower, for viewing"),
+}
+
 
 class App(tk.Tk):
     def __init__(self):
@@ -50,6 +59,7 @@ class App(tk.Tk):
         self.las = tk.StringVar()
         self.out = tk.StringVar()
         self.cell = tk.StringVar(value="auto")
+        self.profile = tk.StringVar(value="Clear")
         self.g1 = tk.BooleanVar(value=False)
         self.keep = tk.BooleanVar(value=False)
 
@@ -65,8 +75,23 @@ class App(tk.Tk):
         ttk.Button(frm, text="Browse…", command=self._pick_out).grid(row=1,
                                                                      column=2)
 
+        # Clear is the default because it is the measured improvement, but the
+        # cleanup threshold was fitted on one survey. Baseline stays reachable
+        # for terrain where that threshold has not been checked.
+        meth = ttk.Frame(frm)
+        meth.grid(row=2, column=1, sticky="w", pady=(10, 0))
+        ttk.Label(meth, text="Method").pack(side="left")
+        box = ttk.Combobox(meth, textvariable=self.profile, width=10,
+                           state="readonly",
+                           values=("Clear", "Baseline", "Deep"))
+        box.pack(side="left", padx=(6, 8))
+        box.bind("<<ComboboxSelected>>", self._describe_profile)
+        self.profile_note = ttk.Label(meth, text=PROFILES["Clear"][1],
+                                      foreground="#444")
+        self.profile_note.pack(side="left")
+
         opts = ttk.Frame(frm)
-        opts.grid(row=2, column=1, sticky="w", pady=(8, 0))
+        opts.grid(row=3, column=1, sticky="w", pady=(8, 0))
         ttk.Label(opts, text="Cell size (m)").pack(side="left")
         ttk.Entry(opts, textvariable=self.cell, width=7).pack(side="left",
                                                               padx=(6, 4))
@@ -95,6 +120,14 @@ class App(tk.Tk):
         self._say("Choose a LAS or LAZ file and an output folder, then Run.")
 
     # ---------------------------------------------------------------- helpers
+    def _describe_profile(self, _event=None):
+        name = self.profile.get()
+        self.profile_note.configure(text=PROFILES[name][1])
+        # Deep chooses its own grid; a typed cell size would contradict it
+        if name == "Deep" and self.cell.get().strip().lower() not in ("", "auto"):
+            self.cell.set("auto")
+            self._say("Deep sets its own cell size; reverted to auto.")
+
     def _pick_las(self):
         p = filedialog.askopenfilename(
             title="Choose a point cloud",
@@ -163,10 +196,11 @@ class App(tk.Tk):
         self._say("")
         self.worker = threading.Thread(
             target=self._work, args=(las, out, cell, self.g1.get(),
-                                     self.keep.get()), daemon=True)
+                                     self.keep.get(), self.profile.get()),
+            daemon=True)
         self.worker.start()
 
-    def _work(self, las, out, cell, make_g1, keep):
+    def _work(self, las, out, cell, make_g1, keep, profile):
         q = self.messages
 
         def progress(stage, message, fraction=None):
@@ -177,9 +211,12 @@ class App(tk.Tk):
 
         try:
             from replicalm import pipeline
-            from replicalm.config import BASELINE
+            from replicalm.config import BASELINE, PRESETS
+            preset, note = PROFILES[profile]
             q.put(("log", "baseline locked %s" % BASELINE["locked"]))
-            result = pipeline.process(las, out, cell_m=cell, make_g1=make_g1,
+            q.put(("log", "method: %s -- %s" % (profile, note)))
+            result = pipeline.process(las, out, cfg=PRESETS[preset],
+                                      cell_m=cell, make_g1=make_g1,
                                       keep_ground=keep, progress=progress)
             q.put(("log", ""))
             q.put(("log", "DEM written: %s" % result["dem"]))

@@ -194,13 +194,28 @@ def classify_tile(in_path, out_path, cfg, verbose=True, srs=None):
     # step 7: ground and near-ground only, LAS 1.2
     keep = " || ".join("Classification == %d" % c for c in cfg.keep_classes)
     stages.append({"type": "filters.expression", "expression": keep})
-    # LAS 1.2 carries point formats 0-5 only, and HeightAboveGround is an
-    # extra dimension that would force a later format. The source method
-    # specifies 1.2 with ground and class 8, so the working dimension is
-    # dropped rather than the version raised.
-    stages.append({"type": "writers.las", "filename": str(out_path),
-                   "minor_version": int(cfg.las_version.split(".")[1]),
-                   "dataformat_id": 1, "compression": "false"})
+    # LAS 1.4 point format 6, written as LAZ. `forward` is held to scale and
+    # offset so nothing else carries over from the input header -- clouds
+    # delivered from TerraScan bring proprietary Terrasolid records that inflate
+    # the file and mean nothing elsewhere. The coordinate system is written
+    # explicitly from the source rather than forwarded, and PDAL sets the WKT
+    # flag that 1.4 requires, so the output is the well-formed version of the
+    # format that so often arrives malformed.
+    writer = {"type": "writers.las", "filename": str(out_path),
+              "minor_version": int(str(cfg.las_version).split(".")[1]),
+              "dataformat_id": int(getattr(cfg, "las_point_format", 6)),
+              "compression": ("laszip" if getattr(cfg, "las_compression", True)
+                              else "false"),
+              "forward": getattr(cfg, "las_forward", "scale,offset"),
+              "software_id": "Replicalm"}
+    if srs:
+        writer["a_srs"] = str(srs)
+    else:
+        from .interpolate import source_srs
+        found = source_srs(in_path)
+        if found:
+            writer["a_srs"] = found
+    stages.append(writer)
 
     pl, kept, fell_back = run_pipeline(stages, verbose=verbose)
 

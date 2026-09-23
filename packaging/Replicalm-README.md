@@ -31,14 +31,41 @@ Start **Replicalm** from the Start Menu.
 |---|---|
 | **Point cloud** | the LAS or LAZ file to process |
 | **Output folder** | where results are written; it is created if it does not exist |
+| **Method** | which processing method to run. Leave it on **Clear** unless you have a reason not to; the three are described below |
 | **Cell size (m)** | metres per pixel of the output map. Leave it on `auto` unless you have a reason not to |
 | **Also build the G1 image** | produces the relief visualizations as well as the elevation model |
-| **Keep classified points** | retains the point cloud with ground returns labelled, so the classification can be inspected |
+| **Keep classified points** | writes out the point cloud with ground returns labelled, so the classification can be inspected |
 
 Press **Run**. The progress bar tracks the run and the message pane reports each
 stage as it finishes. Processing a full survey tile takes tens of minutes to a
 couple of hours depending on its size and whether the images are built; a
 smaller area takes minutes.
+
+### About the method
+
+**Clear** is the default and the recommended choice. It runs the translated
+NCALM workflow and then removes the low vegetation that any ground filter
+accepts as terrain — the scrub, grass tussocks and shrubs that sit a few
+centimetres above the soil. On the surveys it was developed against this
+removes a small percentage of the returns and takes the speckled texture out of
+the relief images, leaving platform surfaces and field boundaries legible.
+
+**Baseline** runs the translated workflow alone, with nothing removed beyond
+what the published method removes. It is the right choice in two cases: when
+you want output directly comparable to the commercial workflow, and when you
+are working on terrain unlike the tropical forest floor the cleanup was
+developed on. The cleanup threshold is a measured value from one survey
+campaign, not a constant of nature, and Baseline is the option that does not
+assume it travels.
+
+**Deep** is Clear on a grid about 1.4 times finer than the point spacing. The
+extra resolution goes into rendering rather than measurement: slope and
+sky-view factor come out without stair-stepping at cell boundaries, which reads
+better at high zoom. It roughly doubles the run time and the file size, and it
+does not make the surface more accurate. Use it for figures.
+
+Whichever you choose is recorded in the settings file, so a result can always
+be traced back to the method that produced it.
 
 ### About cell size
 
@@ -58,7 +85,7 @@ In the output folder:
 |---|---|
 | `<name>_DEM.tif` | the elevation model: a single-band GeoTIFF of ground height in metres, carrying its coordinate system so it lands correctly in any GIS |
 | `<name>_config.json` | every setting the run used, plus how many cells were filled across gaps and how far the edge was trimmed |
-| `<name>_ground.las` | the classified point cloud, if you asked for it |
+| `<name>_ground.laz` | the classified point cloud, if you asked for it: LAS 1.4, compressed, carrying its coordinate system and nothing proprietary |
 | `rvt\` | the G1 composite and the five visualizations it is blended from, if you asked for them |
 
 In the elevation model, **zero means no data**, and no real ground value is ever
@@ -73,6 +100,7 @@ For scripting, `replicalm-cli.cmd` in the installation folder does the same work
 ```
 replicalm-cli.cmd survey.las -o C:\output
 replicalm-cli.cmd survey.las -o C:\output --g1 --cell 0.5
+replicalm-cli.cmd survey.las -o C:\output --profile baseline
 ```
 
 `--help` lists the options. Anything the window can do, this can do, and a run
