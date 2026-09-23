@@ -90,18 +90,21 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
 
     # A cell size can be given, or derived from the density actually measured.
     # 1/sqrt(density) is where rasterised block cross-validation found the
-    # residual curve turning on the Pixoyal window; see grid.cell_for_density.
-    probe = G.grid_for_las(las_path, cell=1.0)
-    probe_area = ((probe.bounds[2] - probe.bounds[0]) *
-                  (probe.bounds[3] - probe.bounds[1]))
-    density = len(z) / probe_area if probe_area > 0 else 0.0
+    # residual curve turning; see grid.cell_for_density.
+    #
+    # Density is measured over the ground the survey covers, not over the
+    # bounding box. A flight strip crosses its box on the diagonal, so the box
+    # is mostly empty: a full G-LiHT tile reads 1.24 returns per square metre
+    # that way against about 4.2 where the returns are, and a cell derived from
+    # the first figure comes out nearly twice too coarse.
+    density, covered = G.covered_density(x, y)
     if cell_m is None:
         cell_m = G.cell_for_density(density)
-        progress("interpolate", "cell size %.2f m derived from %.2f returns "
-                                "per m2" % (cell_m, density))
+        progress("interpolate",
+                 "cell size %.2f m derived from %.2f returns per m2 over "
+                 "%.2f km2 of covered ground"
+                 % (cell_m, density, covered / 1e6))
     g = G.grid_for_las(las_path, cell=cell_m)
-    area = (g.bounds[2] - g.bounds[0]) * (g.bounds[3] - g.bounds[1])
-    density = len(z) / area if area > 0 else 0.0
     radius = (cfg.search_radius_m if cfg.search_radius_mode == "fixed"
               and cfg.search_radius_m else
               K.radius_for_density(density, cfg.max_points,

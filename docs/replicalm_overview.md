@@ -283,13 +283,79 @@ rule should track point spacing is physically sensible and one measurement is
 not a law; a survey of markedly different density should be measured before the
 rule is trusted on it.
 
-A Windows installer is built: `Replicalm-1.0.0-setup.exe`, 1.15 GB, about 4 GB
-installed. It carries its own copies of Python, PDAL, GDAL and PROJ, so nothing
-needs to be installed or configured on the target machine first and it cannot
-collide with software already there. The staged build it wraps has been tested
-end to end — it processes a tile and writes a correctly projected elevation
-model using only its own bundled components. The installation sequence itself
-has not yet been exercised on a second machine.
+## The application
+
+A Windows installer, `Replicalm-1.0.0-setup.exe`, installs a Windows
+executable with user selections for the point cloud to be processed, the output
+folder, the cell size
+in meters per pixel, an optional suite of RVT-based visualizations, and optional
+retention of the classified ground-filtered point cloud. A progress bar
+indicates how far along the run is, and a message window reports the details of
+the processing as it happens.
+
+`Replicalm-1.0.0-setup.exe` is 1.15 GB and takes about 4 GB installed. It carries its own
+copies of Python, PDAL, GDAL and PROJ, so nothing needs to be installed or
+configured on the target machine beforehand, and it cannot collide with software
+already there. Both the installer and the program it installs have been run and
+produce correct output.
+
+![Replicalm v1.0 installer](figures/ReplicalmInstaller.png)
+
+***Replicalm v1.0 installer***
+
+`Replicalm-1.0.0-setup.exe` is a standard Windows installer, 1,180,522 KB,
+compatible with 64-bit Windows 10 and 11. It needs no prerequisites: Python and
+the geospatial libraries travel inside it. The MIT license is presented for
+acceptance at the second step, and the third-party components — PDAL, GDAL,
+PROJ, NumPy, SciPy and the Relief Visualization Toolbox — are installed with
+their own license texts alongside. Installation offers a choice of folder,
+creates Start Menu entries and an optional desktop shortcut, and configures the
+bundled environment for wherever it has been placed.
+
+![Replicalm User Interface](figures/ReplicalmUserInterface.png)
+
+***Replicalm User Interface***
+
+The whole program is one window. The two file selections are the only required
+input; everything else has a working default. The message pane below reports
+each stage as it completes — how many ground returns were classified, their
+density, the search radius chosen, how many cells survived the edge trim, and
+how many were interpolated across gaps. The run shown processed a complete
+G-LiHT flight strip of 14.3 million ground returns, including the full
+visualization suite, in about ninety-six minutes.
+
+![Replicalm GeoTIFF DEM file](figures/ReplicalmDEMgeoTIFF.png)
+
+***Replicalm GeoTIFF DEM file***
+
+The primary output, shown here draped over satellite imagery in a GIS. The
+elevation model carries its coordinate system, so it lands in the right place
+without any manual positioning — the flight strip sits exactly where the survey
+flew it. Brighter is higher. Even in this plain grayscale rendering the
+architecture is visible: the raised platforms of the site core show as pale
+rectangles against the surrounding terrain.
+
+![Replicalm visualization products](figures/ReplicalmVizProducts.png)
+
+***Replicalm visualization products***
+
+With the visualization option selected, six rasters are produced alongside the
+elevation model: the G1 composite, and the four individual analyses it is
+blended from — multi-directional hillshade, positive openness, slope, sky-view
+factor. The sixth provided visualization is the classic Relief Visualization
+Toolkit (RVT) VAT archaeological blend. Each is a separately usable product;
+they are listed here as they appear in the output folder. The narrow diagonal
+form of each is the flight strip itself, with no data either side of it.
+
+![Replicalm.exe G1 visualization](figures/ReplicalmExeG1.png)
+
+***Replicalm.exe G1 visualization***
+
+The G1 composite at full resolution over the site core, produced end to end by
+the installed program from the raw point cloud. Platforms, plazas, range
+structures, the circular feature at the center of the group and the causeway
+running south are all legible. The fine speckle across the open ground is
+residual low vegetation, which the `Clear` configuration removes.
 
 ---
 

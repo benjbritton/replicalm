@@ -119,7 +119,9 @@ Copy-Item (Join-Path $root "src\replicalm") (Join-Path $appDir "src\replicalm") 
     -Recurse -Force -Exclude "__pycache__"
 Copy-Item (Join-Path $here "gui.py")  $appDir -Force
 Copy-Item (Join-Path $root "config.py") $appDir -Force
-Copy-Item (Join-Path $root "README.md") $appDir -Force
+# the installed README is written for someone using the program, not for
+# someone reading the repository
+Copy-Item (Join-Path $here "Replicalm-README.md") (Join-Path $appDir "README.md") -Force
 if (Test-Path (Join-Path $root "docs")) {
     Copy-Item (Join-Path $root "docs") (Join-Path $appDir "docs") -Recurse -Force
 }

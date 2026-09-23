@@ -1,0 +1,125 @@
+# Replicalm 1.0
+
+Bare-earth processing for airborne lidar. Give it a point cloud and it returns a
+ground surface with the vegetation and buildings removed, and optionally the
+relief visualizations used to read archaeological landscapes.
+
+It reproduces the NCALM processing workflow documented in the Estrada-Belli et
+al. 2025 supplementary materials, using only open software. The published method
+needs TerraScan and Golden Surfer; this needs neither.
+
+---
+
+## Installing
+
+Run `Replicalm-1.0.0-setup.exe` and follow the prompts. It needs 64-bit Windows
+10 or 11 and about 4 GB of disk.
+
+Nothing else has to be installed first. Python, PDAL, GDAL, PROJ and the
+visualization libraries all travel inside the installer, in their own private
+copy that cannot interfere with other software on the machine — including any
+existing Python, conda, ArcGIS or QGIS installation.
+
+The last step of installation configures that bundled copy for wherever you put
+it. It takes a few seconds and must be allowed to finish.
+
+## Using it
+
+Start **Replicalm** from the Start Menu.
+
+| field | what it is |
+|---|---|
+| **Point cloud** | the LAS or LAZ file to process |
+| **Output folder** | where results are written; it is created if it does not exist |
+| **Cell size (m)** | metres per pixel of the output map. Leave it on `auto` unless you have a reason not to |
+| **Also build the G1 image** | produces the relief visualizations as well as the elevation model |
+| **Keep classified points** | retains the point cloud with ground returns labelled, so the classification can be inspected |
+
+Press **Run**. The progress bar tracks the run and the message pane reports each
+stage as it finishes. Processing a full survey tile takes tens of minutes to a
+couple of hours depending on its size and whether the images are built; a
+smaller area takes minutes.
+
+### About cell size
+
+`auto` measures how densely the survey's ground returns actually fall and
+chooses a cell to match — roughly the average spacing between returns. On the
+G-LiHT surveys this produces about 0.5 m. A finer grid than the data supports
+adds file size without adding detail; a coarser one throws detail away.
+
+Set a number instead if you need to match an existing product, or if you are
+mosaicking with rasters made at a particular resolution.
+
+## What you get
+
+In the output folder:
+
+| file | what it is |
+|---|---|
+| `<name>_DEM.tif` | the elevation model: a single-band GeoTIFF of ground height in metres, carrying its coordinate system so it lands correctly in any GIS |
+| `<name>_config.json` | every setting the run used, plus how many cells were filled across gaps and how far the edge was trimmed |
+| `<name>_ground.las` | the classified point cloud, if you asked for it |
+| `rvt\` | the G1 composite and the five visualizations it is blended from, if you asked for them |
+
+In the elevation model, **zero means no data**, and no real ground value is ever
+exactly zero. So a gap can never be mistaken for terrain, and terrain can never
+be mistaken for a gap, even if the file passes through software that discards
+the usual no-data marker.
+
+## From a command line
+
+For scripting, `replicalm-cli.cmd` in the installation folder does the same work:
+
+```
+replicalm-cli.cmd survey.las -o C:\output
+replicalm-cli.cmd survey.las -o C:\output --g1 --cell 0.5
+```
+
+`--help` lists the options. Anything the window can do, this can do, and a run
+from either is reproducible from the settings file it writes.
+
+## If something goes wrong
+
+**"Global encoding WKT flag not set for point format 6 - 10"** — the file
+declares LAS 1.4 with a modern point format but omits a flag its own header
+requires. Replicalm reads it anyway, without the coordinate system, and says so.
+The elevation model will be correct but unprojected; supply the projection in
+your GIS, or ask whoever produced the file to correct the header.
+
+**The output has no coordinate system** — the source file carried none that
+could be read. See above.
+
+**The G1 images fail while the elevation model succeeds** — the visualization
+step needs components the elevation path does not. On a managed machine, an
+application-control policy may block them. The elevation model is unaffected.
+
+**"only N ground points"** — the classifier found too little ground to build a
+surface from. Usually the cloud is very sparse, covers mostly water or canopy,
+or has already been filtered to non-ground returns.
+
+## Licensing
+
+Replicalm is MIT licensed — free to use, modify and redistribute, including
+commercially.
+
+It includes components under their own licenses, all permissive: PDAL, GDAL,
+PROJ, NumPy, SciPy, Python and the Relief Visualization Toolbox. Their license
+texts are installed in the `licenses` folder, and `THIRD-PARTY-NOTICES.md` lists
+them.
+
+If you publish work using the visualizations, cite the Relief Visualization
+Toolbox:
+
+> Kokalj, Ž., Somrak, M. (2019). Why Not a Single Image? Combining
+> Visualizations to Facilitate Fieldwork and On-Screen Mapping.
+> *Remote Sensing* 11(7), 747.
+
+## Further reading
+
+The `docs` folder in the installation carries the full account: how the method
+was translated, how closely the output matches the commercial workflow, what was
+measured and what remains unsettled.
+
+---
+
+Benjamin Jay Britton, 2026

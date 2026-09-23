@@ -52,7 +52,8 @@ def source_srs(las_path):
     it and a missing CRS is worse than a slow one.
     """
     import pdal
-    pl = pdal.Pipeline(json.dumps({"pipeline": [str(las_path)]}))
+    from .classify import las_reader
+    pl = pdal.Pipeline(json.dumps({"pipeline": [las_reader(las_path)]}))
     try:
         qi = pl.quickinfo
         info = qi.get("readers.las") or next(iter(qi.values()))
@@ -62,7 +63,14 @@ def source_srs(las_path):
             return wkt
     except Exception:
         pass
-    pl.execute()
+    try:
+        pl.execute()
+    except RuntimeError as e:
+        # a header PDAL will not read has no CRS to give; the caller is told
+        # rather than handed a silently unprojected raster
+        if "Global encoding WKT flag not set" in str(e):
+            return None
+        raise
     md = pl.metadata
     if not isinstance(md, dict):
         md = json.loads(md)
@@ -166,8 +174,11 @@ def verify_alignment(tif_path, las_path, tolerance_cells=1.5):
     import pdal
     gdal.UseExceptions()
 
-    pl = pdal.Pipeline(json.dumps({"pipeline": [str(las_path)]}))
-    pl.execute()
+    from .classify import run_pipeline, las_reader
+    # a header PDAL will not read as-is is still readable without its SRS, and
+    # the bounds are what this check needs -- skipping the check because the
+    # coordinate system is malformed would be the wrong trade
+    pl, _n, _fell_back = run_pipeline([las_reader(las_path)], verbose=False)
     md = pl.metadata if isinstance(pl.metadata, dict) else json.loads(pl.metadata)
     las = md["metadata"]["readers.las"]
     if isinstance(las, list):

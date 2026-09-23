@@ -49,7 +49,7 @@ class App(tk.Tk):
 
         self.las = tk.StringVar()
         self.out = tk.StringVar()
-        self.cell = tk.StringVar(value="1.0")
+        self.cell = tk.StringVar(value="auto")
         self.g1 = tk.BooleanVar(value=False)
         self.keep = tk.BooleanVar(value=False)
 
@@ -69,7 +69,9 @@ class App(tk.Tk):
         opts.grid(row=2, column=1, sticky="w", pady=(8, 0))
         ttk.Label(opts, text="Cell size (m)").pack(side="left")
         ttk.Entry(opts, textvariable=self.cell, width=7).pack(side="left",
-                                                              padx=(6, 18))
+                                                              padx=(6, 4))
+        ttk.Label(opts, text="'auto' matches the point density").pack(
+            side="left", padx=(0, 18))
         ttk.Checkbutton(opts, text="Also build the G1 image",
                         variable=self.g1).pack(side="left", padx=(0, 18))
         ttk.Checkbutton(opts, text="Keep classified points",
@@ -139,13 +141,22 @@ class App(tk.Tk):
         if not out:
             messagebox.showerror(APP, "Choose an output folder first.")
             return
-        try:
-            cell = float(self.cell.get())
-            if cell <= 0:
-                raise ValueError
-        except ValueError:
-            messagebox.showerror(APP, "Cell size must be a positive number.")
-            return
+        # "auto" lets the pipeline derive the cell from measured ground-return
+        # density -- 1/sqrt(density), which is where the residual curve turns.
+        # A fixed default is only right for one density.
+        raw = self.cell.get().strip().lower()
+        if raw in ("", "auto"):
+            cell = None
+        else:
+            try:
+                cell = float(raw)
+                if cell <= 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showerror(
+                    APP, "Cell size must be a positive number, or 'auto' to "
+                         "match it to the point density.")
+                return
 
         self.run_btn.configure(state="disabled")
         self.progress["value"] = 0.0
@@ -172,9 +183,10 @@ class App(tk.Tk):
                                       keep_ground=keep, progress=progress)
             q.put(("log", ""))
             q.put(("log", "DEM written: %s" % result["dem"]))
-            q.put(("log", "%d ground points, %.2f per m2, radius %.2f m"
+            q.put(("log", "%d ground points, %.2f per m2, cell %.2f m, "
+                          "radius %.2f m"
                           % (result["ground_points"], result["density"],
-                             result["search_radius_m"])))
+                             result["cell_m"], result["search_radius_m"])))
             q.put(("log", "%d cells kept after trimming %d from the edge"
                           % (result["cells_after_trim"], result["erode_cells"])))
             if result["filled_cells"]:

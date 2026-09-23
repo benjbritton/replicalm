@@ -49,3 +49,9 @@ packaging/*.log
 
 # Word lock files
 ~$*
+
+# Run outputs written into the repo root by testing
+/*_config.json
+/*_DEM.tif
+/*_ground.las
+/rvt/

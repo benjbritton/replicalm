@@ -87,6 +87,38 @@ class Grid:
         return (abs(dx - round(dx)) < tol) and (abs(dy - round(dy)) < tol)
 
 
+def covered_density(x, y, probe_cell=5.0):
+    """Ground-return density over the area actually covered, not the extent.
+
+    WHY THE BOUNDING BOX IS THE WRONG DENOMINATOR
+    ---------------------------------------------
+    A G-LiHT tile is a flight strip crossing its own bounding box on the
+    diagonal, so most of the box holds no returns at all. Measured over the box,
+    a full l0s395 tile reads 1.24 returns per square metre; measured where the
+    returns are, about 4.2. A cell size derived from the first figure comes out
+    at 0.90 m when 0.5 m is right -- nearly twice too coarse, throwing away
+    detail the survey paid for.
+
+    The covered area is counted by occupancy: bin the returns into coarse cells
+    and total the cells that contain any. `probe_cell` is deliberately much
+    larger than any plausible point spacing, so an occupied cell means "the
+    survey covers this ground" rather than "a point landed exactly here". At
+    5 m it holds 2.5 returns at the sparsest density worth processing and over a
+    thousand at the densest, so it is not sensitive to the choice.
+
+    Returns (density, covered_area_m2).
+    """
+    import numpy as np
+    x = np.asarray(x, float); y = np.asarray(y, float)
+    if len(x) == 0:
+        return 0.0, 0.0
+    ix = np.floor((x - x.min()) / probe_cell).astype(np.int64)
+    iy = np.floor((y - y.min()) / probe_cell).astype(np.int64)
+    occupied = len(np.unique(iy * (ix.max() + 1) + ix))
+    area = occupied * probe_cell * probe_cell
+    return (len(x) / area if area > 0 else 0.0), area
+
+
 def cell_for_density(density, factor=1.0, floor=0.10, ceiling=2.0):
     """A cell size matched to how far apart the ground returns actually are.
 

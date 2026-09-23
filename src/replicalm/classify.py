@@ -54,17 +54,66 @@ def _ground_stage(p, noise_class=None):
     raise ClassifyError("unknown ground algorithm %r" % p.algorithm)
 
 
-def read_points(path):
-    """Read a LAS/LAZ into a structured array, with its header metadata."""
+# LAS 1.4 with point data record format 6 or higher must record its coordinate
+# system as WKT, and must set a bit in the global encoding field saying so. Many
+# files in circulation set the format and not the bit, and PDAL refuses them:
+# "Global encoding WKT flag not set for point format 6 - 10". The file is
+# malformed, but it is the file the user has, and refusing it means refusing
+# much of the modern LAS a survey will hand over.
+#
+# `nosrs` tells the reader to skip the coordinate system, which gets the points
+# in. It cannot invent the projection, so a run that falls back this way has no
+# CRS unless the caller supplies one -- which is why it reports rather than
+# quietly continuing.
+WKT_FLAG_ERROR = "Global encoding WKT flag not set"
+
+
+def las_reader(path, srs=None, nosrs=False):
+    """The reader stage, with the options awkward files need."""
+    stage = {"type": "readers.las", "filename": str(path)}
+    if srs:
+        stage["override_srs"] = str(srs)
+    if nosrs:
+        stage["nosrs"] = True
+    return stage
+
+
+def run_pipeline(stages, verbose=True):
+    """Execute a PDAL pipeline, retrying without the SRS if the header is bad.
+
+    Returns (pipeline, point_count, fell_back).
+    """
     pdal = _pdal()
-    pl = pdal.Pipeline(json.dumps({"pipeline": [str(path)]}))
-    n = pl.execute()
+    try:
+        pl = pdal.Pipeline(json.dumps({"pipeline": stages}))
+        return pl, pl.execute(), False
+    except RuntimeError as e:
+        if WKT_FLAG_ERROR not in str(e):
+            raise
+    retry = list(stages)
+    first = retry[0]
+    if isinstance(first, dict) and first.get("type") == "readers.las":
+        first = dict(first); first["nosrs"] = True
+    else:
+        first = las_reader(first, nosrs=True)
+    retry[0] = first
+    if verbose:
+        print("  this file declares LAS 1.4 point format 6-10 without the WKT "
+              "flag its own header requires; re-reading without the coordinate "
+              "system. Supply one with srs= or the output will be unprojected.")
+    pl = pdal.Pipeline(json.dumps({"pipeline": retry}))
+    return pl, pl.execute(), True
+
+
+def read_points(path, srs=None):
+    """Read a LAS/LAZ into a structured array, with its header metadata."""
+    pl, n, _fell_back = run_pipeline([las_reader(path, srs=srs)], verbose=False)
     if not n:
         raise ClassifyError("no points read from %s" % path)
     return pl.arrays[0], pl.metadata
 
 
-def classify_tile(in_path, out_path, cfg, verbose=True):
+def classify_tile(in_path, out_path, cfg, verbose=True, srs=None):
     """Run steps 3 to 7 on one tile. Returns a dict of counts for the log.
 
     The counts matter as much as the output: a tile whose ground fraction is far
@@ -72,7 +121,7 @@ def classify_tile(in_path, out_path, cfg, verbose=True):
     wrong, and that is visible here before anything is interpolated.
     """
     pdal = _pdal()
-    stages = [str(in_path)]
+    stages = [las_reader(in_path, srs=srs)]
 
     # step 3: every point back to unclassified
     if cfg.reset_classification:
@@ -153,8 +202,7 @@ def classify_tile(in_path, out_path, cfg, verbose=True):
                    "minor_version": int(cfg.las_version.split(".")[1]),
                    "dataformat_id": 1, "compression": "false"})
 
-    pl = pdal.Pipeline(json.dumps({"pipeline": stages}))
-    kept = pl.execute()
+    pl, kept, fell_back = run_pipeline(stages, verbose=verbose)
 
     arr = pl.arrays[0] if pl.arrays else np.zeros(0)
     cls = arr["Classification"] if len(arr) else np.zeros(0, "u1")
