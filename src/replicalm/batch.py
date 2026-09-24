@@ -56,7 +56,8 @@ def _one(job):
     try:
         from .config import PRESETS
         from . import pipeline
-        out = pipeline.process(path, out_dir, cfg=PRESETS[preset], cell_m=cell_m,
+        cfg = PRESETS[preset]
+        out = pipeline.process(path, out_dir, cfg=cfg, cell_m=cell_m,
                                make_g1=make_g1, keep_ground=keep_ground,
                                rvt_script=rvt_script, progress=None)
         rec.update(status="done", seconds=round(time.time() - t0, 1),
@@ -66,6 +67,15 @@ def _one(job):
                    search_radius_m=round(out["search_radius_m"], 3),
                    cells_after_trim=out["cells_after_trim"],
                    filled_cells=out.get("filled_cells", 0),
+                   # How much of this tile was actually kriged. Without it a
+                   # survey-wide run cannot say what fraction of its cells came
+                   # from the covariance model and what fraction from inverse
+                   # distance, which is a methodological fact rather than a
+                   # diagnostic.
+                   fallback_fraction=round(out.get("fallback_fraction", 0.0), 5),
+                   variogram_range_m=(round(out["variogram_range_m"], 4)
+                                      if out.get("variogram_range_m") else None),
+                   max_points=cfg.max_points, min_points=cfg.min_points,
                    locked_baseline=out.get("locked_baseline"))
     except BaseException as exc:            # a worker must not die silently
         rec.update(seconds=round(time.time() - t0, 1),
@@ -126,9 +136,12 @@ def run(las_paths, out_dir, preset="clear", workers=None, cell_m=None,
             _save(manifest, records)
             if rec["status"] == "done":
                 n_ok += 1
-                msg = ("%d pts, %.2f/m2, cell %.2f m, %d cells, %.0f s"
+                msg = ("%d pts, %.2f/m2, cell %.2f m, %d cells, %.0f%% idw, "
+                       "%.0f s"
                        % (rec["ground_points"], rec["density"], rec["cell_m"],
-                          rec["cells_after_trim"], rec["seconds"]))
+                          rec["cells_after_trim"],
+                          100 * rec.get("fallback_fraction", 0.0),
+                          rec["seconds"]))
             else:
                 n_bad += 1
                 msg = "FAILED %s" % rec["error"][:80]

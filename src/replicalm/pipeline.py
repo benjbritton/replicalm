@@ -158,6 +158,15 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
            "ground_points": int(len(z)), "density": density,
            "search_radius_m": radius, "cell_m": cell_m,
            "fallback_fraction": info["fallback_fraction"],
+           # The correlation range is what explains the fallback: when the
+           # nearest max_points neighbours all sit inside it, their pairwise
+           # semivariances are nearly identical, the system loses rank, and the
+           # estimate is inverse distance rather than kriging. Recorded so the
+           # two can be read together across a survey.
+           "variogram_range_m": (float(info["params"][2])
+                                 if info.get("params") is not None
+                                 and len(info["params"]) > 2 else None),
+           "variogram_model": info.get("model"),
            "locked_baseline": baseline, "seconds": round(time.time() - t0, 1)}
     out.update({k: report[k] for k in
                 ("filled_cells", "holes", "erode_cells", "erode_m",
