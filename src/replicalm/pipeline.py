@@ -57,7 +57,7 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     from .config import PRESETS, verify_baseline
 
     progress = progress or _noop
-    cfg = cfg or PRESETS["ncalm"]
+    cfg = cfg or PRESETS["clear"]
     # None means derive it from measured density; cfg.dem_cell_m is the
     # source's fixed figure and is used only if explicitly asked for.
     if cell_m is None and getattr(cfg, "dem_cell_m", None) and derive_cell is False:
@@ -225,6 +225,7 @@ def visualize(dem_path, out_dir, rvt_script=None, res="0p5m", progress=None):
 def main(argv=None):
     """Command line: the same work the launcher does, scriptable."""
     import argparse
+    from dataclasses import replace
     from .config import PRESETS
 
     p = argparse.ArgumentParser(
@@ -241,12 +242,27 @@ def main(argv=None):
     p.add_argument("--profile", "--preset", dest="preset",
                    default="clear", choices=sorted(PRESETS),
                    help="baseline | clear (default) | deep")
+    # The ground filter's elevation tolerance. It decides how far a return may
+    # stand above the provisional surface and still be called ground, so it is
+    # the parameter that most often needs changing on a difficult tile: too
+    # loose and low vegetation is accepted, too tight and real relief is cut.
+    p.add_argument("--threshold", type=float, default=None, metavar="M",
+                   help="SMRF elevation threshold in metres (profile default: "
+                        "0.25 for clear and deep, 0.50 for baseline)")
     a = p.parse_args(argv)
+
+    cfg = PRESETS[a.preset]
+    if a.threshold is not None:
+        if a.threshold <= 0:
+            p.error("--threshold must be positive")
+        cfg = replace(cfg, passes=[replace(cfg.passes[0],
+                                           threshold_m=a.threshold)]
+                                  + list(cfg.passes[1:]))
 
     def show(stage, message, fraction=None):
         print("[%-11s] %s" % (stage, message))
 
-    out = process(a.las, a.out, cfg=PRESETS[a.preset], cell_m=a.cell,
+    out = process(a.las, a.out, cfg=cfg, cell_m=a.cell,
                   make_g1=a.g1, rvt_script=a.rvt_script, progress=show)
     print("\nDEM: %s" % out["dem"])
     print("%d ground points, %.2f per m2, radius %.2f m, %d cells kept"

@@ -30,6 +30,14 @@ VARIANTS = [
     ("smrf s.05 t0.5", dict(algorithm="smrf", slope=0.05, threshold_m=0.5)),
     ("smrf s.05 t0.25", dict(algorithm="smrf", slope=0.05, threshold_m=0.25)),
     ("smrf s.02 t0.25", dict(algorithm="smrf", slope=0.02, threshold_m=0.25)),
+    # PMF (Zhang et al. 2003) on the same slope/threshold ladder as SMRF, so the
+    # two morphological families are compared at matched settings rather than at
+    # each one's own defaults.
+    ("pmf s.10 t1.0",  dict(algorithm="pmf", slope=0.10, threshold_m=1.0)),
+    ("pmf s.10 t0.5",  dict(algorithm="pmf", slope=0.10, threshold_m=0.5)),
+    ("pmf s.05 t0.5",  dict(algorithm="pmf", slope=0.05, threshold_m=0.5)),
+    ("pmf s.05 t0.25", dict(algorithm="pmf", slope=0.05, threshold_m=0.25)),
+    ("pmf s.02 t0.25", dict(algorithm="pmf", slope=0.02, threshold_m=0.25)),
     ("csf rigid2",     dict(algorithm="csf", csf_rigidness=2,
                             csf_threshold_m=0.5)),
     ("csf rigid3",     dict(algorithm="csf", csf_rigidness=3,

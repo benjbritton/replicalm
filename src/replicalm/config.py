@@ -67,7 +67,7 @@ new terrain. `replicalm calibrate` scores a parameter sweep against a reference
 DEM produced by the original workflow, and reports which settings come closest.
 Use it before processing a survey, not after.
 """
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, replace
 import json
 import math
 
@@ -363,46 +363,77 @@ class ReplicalmConfig:
 # steep ground, and all three were wrong.
 
 BASELINE = {
-    "locked": "2026-09-23",
+    "locked": "2026-09-24",
     "algorithm": "smrf",
     "passes": 1,
     "slope": 0.1584,            # tan 9 deg, the source's pass-1 iteration angle
-    "threshold_m": 0.5,
     "cell_m": 0.5,
     "remove_low_noise": False,  # ELM: inert on this data, 0.00% removed
     "remove_outliers": True,    # tile-dependent, see the note above
-    "clean_vegetation": True,   # the delivered method removes residual scrub
     "clean_height_m": 0.20,
     "clean_patch_m": 0.75,
     "search_radius_mode": "density",
     "search_radius_ceiling_m": 20.0,
     "max_points": 16,
     "dem_cell_m": 1.0,
+
+    # Two parameters vary by profile rather than being fixed for every run, so
+    # they are locked per profile instead of globally. Everything above is the
+    # same whichever profile runs.
+    "profiles": {
+        "ncalm":    {"threshold_m": 0.50, "clean_vegetation": True},
+        "baseline": {"threshold_m": 0.50, "clean_vegetation": False},
+        "clear":    {"threshold_m": 0.25, "clean_vegetation": True},
+        "deep":     {"threshold_m": 0.25, "clean_vegetation": True},
+    },
 }
 
 
-def verify_baseline(cfg=None):
+def profile_of(cfg):
+    """Which preset a config is, or None if it matches none of them."""
+    for name in BASELINE["profiles"]:
+        if name in PRESETS and PRESETS[name] == cfg:
+            return name
+    return None
+
+
+def verify_baseline(cfg=None, profile=None):
     """Raise if a config has drifted from the locked baseline.
 
     Call it before a production run. It compares only the parameters that were
     settled by measurement; everything else is free to vary.
+
+    Two of those parameters -- the SMRF elevation threshold and whether the
+    cleanup runs -- legitimately differ between profiles, so they are checked
+    against that profile's locked pair rather than against one global value.
+    A config matching no known profile is checked on the shared parameters
+    only; the caller chose those two deliberately and is not drifting.
     """
-    cfg = cfg if cfg is not None else PRESETS["ncalm"]
+    cfg = cfg if cfg is not None else PRESETS["clear"]
+    profile = profile or profile_of(cfg)
     bad = []
     if len(cfg.passes) != BASELINE["passes"]:
         bad.append("passes: %d, baseline %d"
                    % (len(cfg.passes), BASELINE["passes"]))
     if cfg.passes:
         p = cfg.passes[0]
-        for k in ("algorithm", "slope", "threshold_m", "cell_m"):
+        for k in ("algorithm", "slope", "cell_m"):
             if getattr(p, k) != BASELINE[k]:
                 bad.append("%s: %r, baseline %r"
                            % (k, getattr(p, k), BASELINE[k]))
-    for k in ("remove_low_noise", "remove_outliers", "clean_vegetation",
-              "clean_height_m", "clean_patch_m", "search_radius_mode",
+    for k in ("remove_low_noise", "remove_outliers", "clean_height_m",
+              "clean_patch_m", "search_radius_mode",
               "search_radius_ceiling_m", "max_points"):
         if getattr(cfg, k) != BASELINE[k]:
             bad.append("%s: %r, baseline %r" % (k, getattr(cfg, k), BASELINE[k]))
+    if profile:
+        want = BASELINE["profiles"][profile]
+        if cfg.passes and cfg.passes[0].threshold_m != want["threshold_m"]:
+            bad.append("threshold_m: %r, %s baseline %r"
+                       % (cfg.passes[0].threshold_m, profile, want["threshold_m"]))
+        if cfg.clean_vegetation != want["clean_vegetation"]:
+            bad.append("clean_vegetation: %r, %s baseline %r"
+                       % (cfg.clean_vegetation, profile, want["clean_vegetation"]))
     if bad:
         raise ValueError("config has drifted from the %s baseline:\n  %s"
                          % (BASELINE["locked"], "\n  ".join(bad)))
@@ -412,11 +443,28 @@ def verify_baseline(cfg=None):
 # Presets. NCALM is the translation above; the others exist because the
 # translation is inexact and the right settings are terrain-dependent.
 
+# The default pass, so a preset that changes one parameter inherits the rest
+# rather than respecifying them -- GroundPass's own field defaults are not the
+# same as the configured pass, and listing fields by hand has silently changed
+# cell size and slope before.
+_PASS = ReplicalmConfig().passes[0]
+
 PRESETS = {
-    # The delivered method: the translation, plus removal of the residual low
-    # vegetation the ground filter accepts. This is what the application runs.
+    # The translation at the published 0.5 m elevation threshold. Note this
+    # entry still carries clean_vegetation=True, so it is not the published
+    # method alone -- "baseline" is. The two differ only in that flag.
     "ncalm": ReplicalmConfig(),
-    "clear": ReplicalmConfig(),
+
+    # The delivered method: the translation at a 0.25 m threshold, plus removal
+    # of the residual low vegetation the ground filter still accepts. The
+    # threshold came from a 2 x 2 factorial against the 0.5 m value, crossed
+    # with Clear on and off, on l0s395, l8s431 and l0s444. The two instruments
+    # overlap without being redundant -- tightening the threshold takes some of
+    # what Clear would have taken (Clear's share fell 10.47% to 6.35% on
+    # l8s431) and Clear still finds 6 to 12% afterwards. Together they put bias
+    # within 3.3 mm of zero on all three tiles, the best of any arm, with no
+    # sign of the overshoot that compounding two removals might have produced.
+    "clear": ReplicalmConfig(passes=[replace(_PASS, threshold_m=0.25)]),
 
     # The translation alone, with nothing removed beyond what the source method
     # removes. This is what the published comparison figures are measured
@@ -426,7 +474,8 @@ PRESETS = {
 
     # Clear on a grid finer than the point spacing. The extra resolution is for
     # rendering, not for accuracy -- see cell_factor.
-    "deep": ReplicalmConfig(cell_factor=0.7),
+    "deep": ReplicalmConfig(cell_factor=0.7,
+                            passes=[replace(_PASS, threshold_m=0.25)]),
     "ncalm_csf": ReplicalmConfig(passes=[
         GroundPass(algorithm="csf", csf_rigidness=2, csf_threshold_m=0.5,
                    stands_in_for="TerraScan pass 1, via cloth simulation"),

@@ -60,6 +60,7 @@ class App(tk.Tk):
         self.out = tk.StringVar()
         self.cell = tk.StringVar(value="auto")
         self.profile = tk.StringVar(value="Clear")
+        self.threshold = tk.StringVar(value="auto")
         self.g1 = tk.BooleanVar(value=False)
         self.keep = tk.BooleanVar(value=False)
 
@@ -99,6 +100,11 @@ class App(tk.Tk):
             side="left", padx=(0, 18))
         ttk.Checkbutton(opts, text="Also build the G1 image",
                         variable=self.g1).pack(side="left", padx=(0, 18))
+
+        ttk.Label(opts, text="Ground threshold (m)").pack(side="left",
+                                                          padx=(0, 0))
+        ttk.Entry(opts, textvariable=self.threshold, width=7).pack(
+            side="left", padx=(6, 18))
         ttk.Checkbutton(opts, text="Keep classified points",
                         variable=self.keep).pack(side="left")
         frm.columnconfigure(1, weight=1)
@@ -191,16 +197,34 @@ class App(tk.Tk):
                          "match it to the point density.")
                 return
 
+        # The ground filter's elevation tolerance. 'auto' leaves it at the
+        # selected method's default -- 0.25 m for Clear and Deep, 0.50 m for
+        # Baseline, which is the published figure.
+        raw_t = self.threshold.get().strip().lower()
+        if raw_t in ("", "auto"):
+            threshold = None
+        else:
+            try:
+                threshold = float(raw_t)
+                if threshold <= 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showerror(
+                    APP, "Ground threshold must be a positive number of "
+                         "metres, or 'auto' to use the method's default.")
+                return
+
         self.run_btn.configure(state="disabled")
         self.progress["value"] = 0.0
         self._say("")
         self.worker = threading.Thread(
             target=self._work, args=(las, out, cell, self.g1.get(),
-                                     self.keep.get(), self.profile.get()),
+                                     self.keep.get(), self.profile.get(),
+                                     threshold),
             daemon=True)
         self.worker.start()
 
-    def _work(self, las, out, cell, make_g1, keep, profile):
+    def _work(self, las, out, cell, make_g1, keep, profile, threshold):
         q = self.messages
 
         def progress(stage, message, fraction=None):
@@ -210,12 +234,21 @@ class App(tk.Tk):
                 q.put(("fraction", fraction))
 
         try:
+            from dataclasses import replace
             from replicalm import pipeline
             from replicalm.config import BASELINE, PRESETS
             preset, note = PROFILES[profile]
+            cfg = PRESETS[preset]
+            if threshold is not None:
+                cfg = replace(cfg, passes=[replace(cfg.passes[0],
+                                                   threshold_m=threshold)]
+                                          + list(cfg.passes[1:]))
             q.put(("log", "baseline locked %s" % BASELINE["locked"]))
             q.put(("log", "method: %s -- %s" % (profile, note)))
-            result = pipeline.process(las, out, cfg=PRESETS[preset],
+            q.put(("log", "ground threshold: %s m"
+                          % ("%.2f" % threshold if threshold is not None
+                             else "%.2f (method default)" % cfg.passes[0].threshold_m)))
+            result = pipeline.process(las, out, cfg=cfg,
                                       cell_m=cell, make_g1=make_g1,
                                       keep_ground=keep, progress=progress)
             q.put(("log", ""))

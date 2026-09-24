@@ -255,3 +255,73 @@ every cell size. Returns-below-surface improves as cells shrink for a reason
 unrelated to quality: a coarse cell averages over more ground, so returns at the
 low end fall beneath its single value. Both are sound for comparing
 classifications and useless for comparing resolutions.
+
+---
+
+## 10. The tightened threshold and Clear together smooth below the reference on steep ground
+
+**Status:** open, and the first question the Ka'Kabish surfaces are meant to
+answer.
+
+The SMRF elevation threshold and the `cleanup.clear()` rule remove overlapping
+populations. A 2 x 2 factorial -- threshold 0.50 m against 0.25 m, crossed with
+Clear on and off, at the locked slope of 0.1584 on l0s395, l8s431 and l0s444 --
+settled how they interact:
+
+| tile | arm | Clear removed | RMSE | bias | complexity |
+|---|---|---|---|---|---|
+| l0s395 | t0.50 raw | -- | 0.0229 | +0.0010 | 1.04x |
+| | t0.50 + Clear | 0.80% | 0.0188 | -0.0006 | 0.90x |
+| | t0.25 raw | -- | 0.0193 | +0.0002 | 0.95x |
+| | t0.25 + Clear | 0.60% | 0.0186 | -0.0007 | 0.90x |
+| l8s431 | t0.50 raw | -- | 0.0804 | +0.0367 | 1.37x |
+| | t0.50 + Clear | 10.47% | 0.0499 | +0.0107 | 0.93x |
+| | t0.25 raw | -- | 0.0476 | +0.0157 | 0.91x |
+| | t0.25 + Clear | 6.35% | 0.0404 | +0.0033 | **0.78x** |
+| l0s444 | t0.50 raw | -- | 0.0606 | +0.0263 | 1.28x |
+| | t0.50 + Clear | 14.74% | 0.0405 | +0.0017 | 1.09x |
+| | t0.25 raw | -- | 0.0431 | +0.0151 | 1.10x |
+| | t0.25 + Clear | 11.76% | 0.0357 | -0.0023 | 1.02x |
+
+They overlap without being redundant. Tightening the threshold takes some of
+what Clear would have taken -- Clear's share falls from 10.47% to 6.35% on
+l8s431 and from 14.74% to 11.76% on l0s444 -- yet Clear still finds 6 to 12%
+afterwards and still improves both RMSE and bias. Together they put bias within
+3.3 mm of zero on all three tiles, the best of any arm, with none of the
+overshoot that compounding two removals might have produced. That is why
+`clear` and `deep` now carry a 0.25 m threshold.
+
+**What is open.** On l8s431, the tile with the most relief, the pair returns
+**0.78x the reference's terrain complexity** -- 22% less texture than the
+archive, against 0.93x for Clear alone. Two readings fit equally well:
+
+- the archive is carrying vegetation texture it should not, which is the
+  premise the whole cleanup rests on; or
+- the pair has begun eroding real relief, and the smoothing is loss.
+
+Nothing in an archive-referenced measurement can separate them, because the
+archive is the thing in question. Note the direction of the risk: every
+internal metric available here rewards a smoother surface, so a measurement
+that says "better" is not evidence against the second reading.
+
+**How it gets settled.** A regional block flown over Ka'Kabish and Cocochan in
+northern Belize carries three overlapping strips, and surfaces within it have
+been selected for this test. An engineered plaza floor under closed canopy holds
+the substrate constant while the understory varies across it, so filter error can
+be scored against vegetation height rather than against another product. The
+chosen test surface sits close to a site centre at 0.21% slope under 18.7 m
+canopy, with 4.8% of returns in the 0.15-0.35 m band and three strips at a 57
+degree spread; it pairs with a lower-understory run on the same platform complex
+and the same passes. If the tightened pair is eroding relief, it will show as
+removal that scales with understory over ground known to be flat.
+
+Measurements from that block are not in this repository. The point clouds are
+Alec McLellan's and nothing derived from them is published without his approval,
+so the cell inventory, the coordinates and the three-filter regression live
+outside it, at `REPLICALM_NR_RESULTS` (default `C:/NR_Lidar/replicalm_results`),
+and `benchmarks/results/nr_block/` is gitignored. `benchmarks/scan_block.py` and
+`benchmarks/band_regression.py` are tracked and rebuild them from the source
+tiles.
+
+Measurements in this repository:
+`benchmarks/results/threshold_clear/threshold_clear.json` (12 arms).
