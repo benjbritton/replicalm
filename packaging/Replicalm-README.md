@@ -34,6 +34,7 @@ Start **Replicalm** from the Start Menu.
 | **Method** | which processing method to run. Leave it on **Clear** unless you have a reason not to; the three are described below |
 | **Cell size (m)** | metres per pixel of the output map. Leave it on `auto` unless you have a reason not to |
 | **Ground threshold (m)** | how far a return may stand above the provisional surface and still count as ground. Leave it on `auto` unless a tile comes out wrong |
+| **Search neighbours** | how many nearby ground points each output cell is estimated from. Leave on `auto` |
 | **Also build the G1 image** | produces the relief visualizations as well as the elevation model |
 | **Keep classified points** | writes out the point cloud with ground returns labelled, so the classification can be inspected |
 
@@ -89,6 +90,27 @@ elevation bias from +0.037 m to +0.016 m before any cleanup ran, and with the
 cleanup applied it brought bias within 3 mm of zero on all three. On one steep
 tile, though, the result also came out smoother than the reference product, so
 on strongly relieved terrain it is worth comparing both.
+
+### About the search neighbours
+
+Each cell of the elevation model is estimated from the ground points around it,
+weighted by distance. These two numbers set how many may take part: at most
+`max`, and at least `min` before the cell is left empty instead.
+
+`auto` uses the method's own values — 64 and 1 for Baseline, which is what the
+published workflow specifies, and 16 and 3 for Clear and Deep.
+
+In most cases this changes nothing, and it is worth understanding why. The
+weighting comes from a model fitted to the survey itself, which measures the
+distance beyond which two points stop resembling each other. Past that
+distance a neighbour contributes almost nothing however many you allow, so on
+surveys where that distance is short the setting is inert.
+
+It starts to matter on smooth ground, where points stay similar over long
+distances and a larger neighbourhood genuinely averages more terrain, and on
+sparse surveys where every neighbour still falls inside that distance. If you
+are working on such data and the surface looks noisier or smoother than it
+should, this is the setting to try.
 
 ### About cell size
 

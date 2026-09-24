@@ -381,10 +381,20 @@ BASELINE = {
     # they are locked per profile instead of globally. Everything above is the
     # same whichever profile runs.
     "profiles": {
-        "ncalm":    {"threshold_m": 0.50, "clean_vegetation": True},
-        "baseline": {"threshold_m": 0.50, "clean_vegetation": False},
-        "clear":    {"threshold_m": 0.25, "clean_vegetation": True},
-        "deep":     {"threshold_m": 0.25, "clean_vegetation": True},
+        "ncalm":    {"threshold_m": 0.50, "clean_vegetation": True,
+                     "max_points": 16, "min_points": 3},
+        # The replication target uses the source's own neighbourhood: 20 m
+        # radius, up to 64 points, minimum 1 (Estrada-Belli et al. 2025
+        # supplementary; GLiHT_Methods_Materials section 5.2). Replicalm's 16
+        # and 3 were chosen on their own merits and are kept for the other
+        # profiles, but a configuration whose purpose is fidelity should not
+        # differ from its target in the size of the neighbourhood it averages.
+        "baseline": {"threshold_m": 0.50, "clean_vegetation": False,
+                     "max_points": 64, "min_points": 1},
+        "clear":    {"threshold_m": 0.25, "clean_vegetation": True,
+                     "max_points": 16, "min_points": 3},
+        "deep":     {"threshold_m": 0.25, "clean_vegetation": True,
+                     "max_points": 16, "min_points": 3},
     },
 }
 
@@ -423,7 +433,7 @@ def verify_baseline(cfg=None, profile=None):
                            % (k, getattr(p, k), BASELINE[k]))
     for k in ("remove_low_noise", "remove_outliers", "clean_height_m",
               "clean_patch_m", "search_radius_mode",
-              "search_radius_ceiling_m", "max_points"):
+              "search_radius_ceiling_m"):
         if getattr(cfg, k) != BASELINE[k]:
             bad.append("%s: %r, baseline %r" % (k, getattr(cfg, k), BASELINE[k]))
     if profile:
@@ -434,6 +444,10 @@ def verify_baseline(cfg=None, profile=None):
         if cfg.clean_vegetation != want["clean_vegetation"]:
             bad.append("clean_vegetation: %r, %s baseline %r"
                        % (cfg.clean_vegetation, profile, want["clean_vegetation"]))
+        for k in ("max_points", "min_points"):
+            if getattr(cfg, k) != want[k]:
+                bad.append("%s: %r, %s baseline %r"
+                           % (k, getattr(cfg, k), profile, want[k]))
     if bad:
         raise ValueError("config has drifted from the %s baseline:\n  %s"
                          % (BASELINE["locked"], "\n  ".join(bad)))
@@ -470,7 +484,8 @@ PRESETS = {
     # removes. This is what the published comparison figures are measured
     # against, and the right choice on terrain where the cleanup threshold has
     # not been checked.
-    "baseline": ReplicalmConfig(clean_vegetation=False),
+    "baseline": ReplicalmConfig(clean_vegetation=False,
+                                max_points=64, min_points=1),
 
     # Clear on a grid finer than the point spacing. The extra resolution is for
     # rendering, not for accuracy -- see cell_factor.

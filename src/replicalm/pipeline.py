@@ -249,9 +249,29 @@ def main(argv=None):
     p.add_argument("--threshold", type=float, default=None, metavar="M",
                    help="SMRF elevation threshold in metres (profile default: "
                         "0.25 for clear and deep, 0.50 for baseline)")
+    # The search neighbourhood. The kriging estimate weights neighbours by the
+    # fitted variogram, so beyond the correlation range extra neighbours carry
+    # almost no weight and the count stops mattering -- which is why 16 and 64
+    # agree on surveys whose range is short against the search radius. Where the
+    # range is long relative to point spacing they diverge, so the count is a
+    # property of the survey rather than a constant, and is exposed.
+    p.add_argument("--max-points", type=int, default=None, metavar="N",
+                   help="most neighbours per estimate (profile default: 64 for "
+                        "baseline, matching the source; 16 otherwise)")
+    p.add_argument("--min-points", type=int, default=None, metavar="N",
+                   help="fewest neighbours before a cell is left empty "
+                        "(profile default: 1 for baseline, 3 otherwise)")
     a = p.parse_args(argv)
 
     cfg = PRESETS[a.preset]
+    if a.max_points is not None or a.min_points is not None:
+        mx = a.max_points if a.max_points is not None else cfg.max_points
+        mn = a.min_points if a.min_points is not None else cfg.min_points
+        if mx < 1 or mn < 1:
+            p.error("--max-points and --min-points must be at least 1")
+        if mn > mx:
+            p.error("--min-points (%d) cannot exceed --max-points (%d)" % (mn, mx))
+        cfg = replace(cfg, max_points=mx, min_points=mn)
     if a.threshold is not None:
         if a.threshold <= 0:
             p.error("--threshold must be positive")

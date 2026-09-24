@@ -61,6 +61,8 @@ class App(tk.Tk):
         self.cell = tk.StringVar(value="auto")
         self.profile = tk.StringVar(value="Clear")
         self.threshold = tk.StringVar(value="auto")
+        self.maxpts = tk.StringVar(value="auto")
+        self.minpts = tk.StringVar(value="auto")
         self.g1 = tk.BooleanVar(value=False)
         self.keep = tk.BooleanVar(value=False)
 
@@ -108,6 +110,21 @@ class App(tk.Tk):
         ttk.Checkbutton(opts, text="Keep classified points",
                         variable=self.keep).pack(side="left")
         frm.columnconfigure(1, weight=1)
+
+        # The search neighbourhood. Left alone on most surveys: past the
+        # variogram's correlation range extra neighbours carry almost no weight,
+        # so the count only matters where that range is long relative to the
+        # spacing between returns.
+        nb = ttk.Frame(frm)
+        nb.grid(row=4, column=1, sticky="w", pady=(6, 0))
+        ttk.Label(nb, text="Search neighbours  max").pack(side="left")
+        ttk.Entry(nb, textvariable=self.maxpts, width=7).pack(side="left",
+                                                              padx=(6, 10))
+        ttk.Label(nb, text="min").pack(side="left")
+        ttk.Entry(nb, textvariable=self.minpts, width=7).pack(side="left",
+                                                              padx=(6, 10))
+        ttk.Label(nb, text="'auto' uses the method's own values",
+                  foreground="#444").pack(side="left")
 
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=10)
@@ -214,17 +231,42 @@ class App(tk.Tk):
                          "metres, or 'auto' to use the method's default.")
                 return
 
+        def whole(var, label):
+            raw = var.get().strip().lower()
+            if raw in ("", "auto"):
+                return None
+            try:
+                v = int(raw)
+                if v < 1:
+                    raise ValueError
+                return v
+            except ValueError:
+                messagebox.showerror(
+                    APP, "%s must be a whole number of at least 1, or 'auto' "
+                         "to use the method's own value." % label)
+                raise ValueError
+        try:
+            maxpts = whole(self.maxpts, "Maximum search neighbours")
+            minpts = whole(self.minpts, "Minimum search neighbours")
+        except ValueError:
+            return
+        if maxpts is not None and minpts is not None and minpts > maxpts:
+            messagebox.showerror(APP, "Minimum search neighbours cannot exceed "
+                                      "the maximum.")
+            return
+
         self.run_btn.configure(state="disabled")
         self.progress["value"] = 0.0
         self._say("")
         self.worker = threading.Thread(
             target=self._work, args=(las, out, cell, self.g1.get(),
                                      self.keep.get(), self.profile.get(),
-                                     threshold),
+                                     threshold, maxpts, minpts),
             daemon=True)
         self.worker.start()
 
-    def _work(self, las, out, cell, make_g1, keep, profile, threshold):
+    def _work(self, las, out, cell, make_g1, keep, profile, threshold,
+              maxpts, minpts):
         q = self.messages
 
         def progress(stage, message, fraction=None):
@@ -243,8 +285,16 @@ class App(tk.Tk):
                 cfg = replace(cfg, passes=[replace(cfg.passes[0],
                                                    threshold_m=threshold)]
                                           + list(cfg.passes[1:]))
+            if maxpts is not None or minpts is not None:
+                cfg = replace(cfg,
+                              max_points=maxpts if maxpts is not None
+                              else cfg.max_points,
+                              min_points=minpts if minpts is not None
+                              else cfg.min_points)
             q.put(("log", "baseline locked %s" % BASELINE["locked"]))
             q.put(("log", "method: %s -- %s" % (profile, note)))
+            q.put(("log", "search neighbours: %d max, %d min"
+                          % (cfg.max_points, cfg.min_points)))
             q.put(("log", "ground threshold: %s m"
                           % ("%.2f" % threshold if threshold is not None
                              else "%.2f (method default)" % cfg.passes[0].threshold_m)))
