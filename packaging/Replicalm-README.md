@@ -33,6 +33,7 @@ Start **Replicalm** from the Start Menu.
 | **Output folder** | where results are written; it is created if it does not exist |
 | **Method** | which processing method to run. Leave it on **Clear** unless you have a reason not to; the three are described below |
 | **Cell size (m)** | metres per pixel of the output map. Leave it on `auto` unless you have a reason not to |
+| **Ground threshold (m)** | how far a return may stand above the provisional surface and still count as ground. Leave it on `auto` unless a tile comes out wrong |
 | **Also build the G1 image** | produces the relief visualizations as well as the elevation model |
 | **Keep classified points** | writes out the point cloud with ground returns labelled, so the classification can be inspected |
 
@@ -66,6 +67,28 @@ does not make the surface more accurate. Use it for figures.
 
 Whichever you choose is recorded in the settings file, so a result can always
 be traced back to the method that produced it.
+
+### About the ground threshold
+
+This is the one setting worth reaching for when a tile comes out wrong, because
+it decides what the classifier is willing to call ground. A return standing
+higher than the threshold above the provisional surface is treated as something
+else — vegetation, a building, a wire.
+
+`auto` uses the method's own value: **0.25 m for Clear and Deep**, 0.50 m for
+Baseline, which is the figure the published workflow specifies.
+
+Raise it — 0.5 m, or higher on rugged ground — if the model looks scraped, with
+ridge crests flattened or small rises missing. Lower it if flat ground comes out
+speckled, or if low scrub is showing up as terrain. The two failures look quite
+different once you have seen them: too loose leaves texture that should not be
+there, too tight removes relief that should.
+
+The 0.25 m default was measured. Against 0.50 m on three test tiles it cut the
+elevation bias from +0.037 m to +0.016 m before any cleanup ran, and with the
+cleanup applied it brought bias within 3 mm of zero on all three. On one steep
+tile, though, the result also came out smoother than the reference product, so
+on strongly relieved terrain it is worth comparing both.
 
 ### About cell size
 

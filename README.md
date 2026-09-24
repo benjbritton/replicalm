@@ -212,7 +212,7 @@ Rebuild with `.uild.ps1`; see [packaging/README.md](packaging/README.md).
 |---|---|---|
 | ground filter | `filters.smrf`, one pass | second pass gave nothing across seven tiles and doubled runtime |
 | slope | 0.1584 | tan 9°, the source's pass-1 iteration angle |
-| threshold | 0.5 m | the source's 3.0 m admits almost everything: 17.68% vs 10.34% error above 30° |
+| threshold | 0.5 m baseline, 0.25 m clear and deep | the source's 3.0 m admits almost everything: 17.68% vs 10.34% error above 30 deg. 0.25 m was measured against 0.5 m in a 2x2 with Clear on and off; see open observation 10 |
 | working grid | 0.5 m | tied to the output cell; at 1.0 m steep faces terrace |
 | ELM filter | off | removed 0.00% of points on every window tested |
 | outlier filter | on | helps on one tile, hurts on another; sweep it per survey |
