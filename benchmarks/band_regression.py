@@ -31,11 +31,13 @@ from replicalm.config import GroundPass
 D = os.environ.get(
     "REPLICALM_NR_ROOT",
     r"C:\NR_Lidar\Original_LAS_Files_15March2023\Original_LAS_Files_15March2023")
-# The block's point clouds are Alec McLellan's, and nothing derived from
-# them is published without his approval, so results are written outside
-# the repository and the path is gitignored.
-RESULTS = os.environ.get("REPLICALM_NR_RESULTS",
-                        "C:/NR_Lidar/replicalm_results")
+# Results live in the repository now; McLellan gave permission to publish
+# measurements derived from the block on 2026-09-24. The environment
+# variable still overrides, for working outside a checkout.
+RESULTS = os.environ.get(
+    "REPLICALM_NR_RESULTS",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                 "results", "nr_block"))
 os.makedirs(RESULTS, exist_ok=True)
 # The tracked scan is gzipped and already restricted to three-strip cells.
 CELLS = os.path.join(RESULTS, "cells_3strip.json.gz")

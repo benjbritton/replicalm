@@ -56,9 +56,3 @@ packaging/*.log
 /*_ground.las
 /rvt/
 
-# New River / Ka'Kabish block. The point clouds are Alec McLellan's and nothing
-# derived from them is published without his approval, so the measurements live
-# outside the repository -- REPLICALM_NR_RESULTS, default
-# C:\NR_Lidar\replicalm_results. The scripts that produce them are tracked; the
-# numbers are not.
-benchmarks/results/nr_block/

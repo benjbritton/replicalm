@@ -28,7 +28,13 @@ from replicalm.classify import las_reader
 D = os.environ.get(
     "REPLICALM_NR_ROOT",
     "C:/NR_Lidar/Original_LAS_Files_15March2023/Original_LAS_Files_15March2023")
-RESULTS = os.environ.get("REPLICALM_NR_RESULTS", "C:/NR_Lidar/replicalm_results")
+# Results live in the repository now; McLellan gave permission to publish
+# measurements derived from the block on 2026-09-24. The environment
+# variable still overrides, for working outside a checkout.
+RESULTS = os.environ.get(
+    "REPLICALM_NR_RESULTS",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                 "results", "nr_block"))
 HALF = 10.0
 
 R = json.load(open(os.path.join(RESULTS, "band_regression.json")))

@@ -305,23 +305,56 @@ internal metric available here rewards a smoother surface, so a measurement
 that says "better" is not evidence against the second reading.
 
 **How it gets settled.** A regional block flown over Ka'Kabish and Cocochan in
-northern Belize carries three overlapping strips, and surfaces within it have
-been selected for this test. An engineered plaza floor under closed canopy holds
-the substrate constant while the understory varies across it, so filter error can
-be scored against vegetation height rather than against another product. The
-chosen test surface sits close to a site centre at 0.21% slope under 18.7 m
-canopy, with 4.8% of returns in the 0.15-0.35 m band and three strips at a 57
-degree spread; it pairs with a lower-understory run on the same platform complex
-and the same passes. If the tightened pair is eroding relief, it will show as
-removal that scales with understory over ground known to be flat.
+northern Belize on 17 May 2022 carries three overlapping strips at 12.9 to 21
+returns per m2, so the same ground was observed independently three times at
+different scan angles. An engineered plaza floor under closed canopy holds the
+substrate constant while the understory varies across it, which lets filter
+error be scored against vegetation height rather than against another product.
 
-Measurements from that block are not in this repository. The point clouds are
-Alec McLellan's and nothing derived from them is published without his approval,
-so the cell inventory, the coordinates and the three-filter regression live
-outside it, at `REPLICALM_NR_RESULTS` (default `C:/NR_Lidar/replicalm_results`),
-and `benchmarks/results/nr_block/` is gitignored. `benchmarks/scan_block.py` and
-`benchmarks/band_regression.py` are tracked and rebuild them from the source
-tiles.
+The test surface is at 316450.8 E, 1970610.0 N (UTM 16N), 148 m from the
+Ka'Kabish centre: 0.21% slope, 18.7 m canopy, 77% of returns above 2 m, 4.8% in
+the 0.15-0.35 m band, three strips at a 57 degree spread. It pairs with a
+lower-understory run on the same platform complex at x = 316509, y 1970589 to
+1970631 -- three contiguous cells, 0.93 to 1.87% slope, 1.3 to 1.7% band, the
+same three passes at nearly the same incidence.
 
-Measurements in this repository:
-`benchmarks/results/threshold_clear/threshold_clear.json` (12 arms).
+**What the block has already settled.** Across 41 flat cells (slope under 2%,
+three strips, band fraction 3.1 to 13.2%), each filter's surface was measured
+against the 1st percentile of all returns in its own cell -- a datum that
+references no classification and no commercial product:
+
+| filter | surface rise per 10% band | r | t |
+|---|---|---|---|
+| CSF | +0.553 m | +0.49 | +3.55 |
+| SMRF | +0.456 m | +0.42 | +2.91 |
+| PMF | -0.034 m | -0.03 | -0.21 |
+
+Over ground with no reason to be higher where the scrub is thicker, SMRF and CSF
+rise with understory and PMF does not. Recovered ground density says the same
+independently: SMRF +7.23 and CSF +7.73 returns per m2 per 10% band, PMF -0.06.
+So SMRF and CSF are following the understory, and the ambiguity in the
+filter-to-filter comparison -- which could equally have been PMF eroding terrain
+-- is resolved in that direction.
+
+That also reconciles the two datasets. On G-LiHT, scored against the TerraScan
+archive, PMF looked worst: biased low on every tile at 0.34 to 0.75x the
+reference's texture. But the archive shares the understory acceptance now
+measured in SMRF and CSF, so part of PMF's negative bias is it correctly
+declining vegetation the archive kept. Not all of it -- 0.34x is too much
+smoothing to explain that way -- so PMF plausibly over-erodes relief *and*
+rejects understory properly.
+
+**What is still open.** How far above the soil any of them sits; whether PMF is
+right or merely anchored to the minimum surface, since it holds a near-constant
+0.20 m above the lowest returns; and whether the l8s431 complexity drop is
+vegetation texture in the archive or lost relief. Those need surveyed control,
+which is a follow-up rather than a dependency.
+
+Measurements: `benchmarks/results/threshold_clear/threshold_clear.json` (12
+arms), `benchmarks/results/nr_block/cells_3strip.json.gz` (12,506 cells with
+three-strip coverage, trimmed from 63,253 scored; denominators in
+`cells_summary.json`), `band_regression.json` (41 cells x 3 filters),
+`band_offset.json` (the table above). Rebuild with `benchmarks/scan_block.py`,
+`band_regression.py` and `band_offset.py`.
+
+Point clouds by Alec McLellan; published here with his permission.

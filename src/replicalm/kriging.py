@@ -39,8 +39,17 @@ exactly the documented figure rather than approximately whatever a library's
 defaults produce.
 """
 import math
+import os
 
 import numpy as np
+
+
+def _query_workers():
+    """Cores for the neighbour query: all of them unless told otherwise."""
+    try:
+        return int(os.environ.get("REPLICALM_QUERY_WORKERS", "-1"))
+    except ValueError:
+        return -1
 
 
 class KrigingError(RuntimeError):
@@ -167,7 +176,7 @@ def fit_variogram(x, y, z, model="spherical", n_lags=12, max_lag=None,
 
 def krige_grid(x, y, z, grid, radius=20.0, max_points=32, min_points=3,
                model="spherical", variogram=None, nodata=-9999.0,
-               verbose=True, chunk_cells=1000000):
+               verbose=True, chunk_cells=1000000, solve_batch=50000):
     """Ordinary kriging of scattered points onto a declared grid.
 
     Cells with fewer than `min_points` neighbours inside the radius are left as
@@ -214,68 +223,105 @@ def krige_grid(x, y, z, grid, radius=20.0, max_points=32, min_points=3,
         ys = grid.origin_y - (np.arange(r0, r1) + 0.5) * grid.dy
         cxs, cys = np.meshgrid(xs, ys)
         chunk = np.c_[cxs.ravel(), cys.ravel()]
-        dist, idx = tree.query(chunk, k=k_use, distance_upper_bound=radius)
+        # The query threads across cores. That is right for one tile and wrong
+        # inside a batch run, where every worker process would claim every core
+        # and they would spend their time contending rather than working. The
+        # batch driver sets this to 1 and parallelises over tiles instead.
+        dist, idx = tree.query(chunk, k=k_use, distance_upper_bound=radius,
+                               workers=_query_workers())
         if dist.ndim == 1:
             dist, idx = dist[:, None], idx[:, None]
         base = r0 * grid.width
-        for j in range(len(chunk)):
-            c = base + j
-            d = dist[j]
-            good = np.isfinite(d)
-            k = int(good.sum())
-            if k < min_points:
-                continue
-            ii = idx[j][good]
-            px, py, pz = x[ii], y[ii], z[ii]
 
-            # pairwise lags among the neighbours, and to the cell centre
-            dxy = np.hypot(px[:, None] - px[None, :], py[:, None] - py[None, :])
-            G = mdl(dxy, *p)
-            g0 = mdl(d[good], *p)
+        # THE SOLVES ARE BATCHED BY NEIGHBOUR COUNT
+        #
+        # Every cell builds the same shape of system, so cells that found the
+        # same number of neighbours can be solved together: numpy's solve takes
+        # a stack of matrices and hands it to LAPACK in one call, where the
+        # per-cell loop paid Python's overhead on every one of tens of millions
+        # of 17x17 systems. The arithmetic is identical -- same neighbours, same
+        # semivariances, same system -- only the dispatch changes.
+        #
+        # cKDTree returns distances ascending with infinity padding, so a cell
+        # with k finite neighbours has them in the first k columns and `[:, :k]`
+        # selects exactly what `d[good]` selected before.
+        n_good = np.isfinite(dist).sum(1)
+        usable = n_good >= min_points
+        for kval in np.unique(n_good[usable]):
+            sel = np.flatnonzero(usable & (n_good == kval))
+            kval = int(kval)
+            # Sub-batched because the stacked systems are the memory high water
+            # mark: k+1 squared doubles per cell, ~2.3 kB at sixteen neighbours.
+            for s0 in range(0, len(sel), solve_batch):
+                cells = sel[s0:s0 + solve_batch]
+                ii = idx[cells, :kval]
+                dd = dist[cells, :kval]
+                px, py, pz = x[ii], y[ii], z[ii]
+                m = len(cells)
 
-            # ordinary kriging system with the unbiasedness constraint
-            A = np.empty((k + 1, k + 1))
-            A[:k, :k] = G
-            A[:k, k] = 1.0
-            A[k, :k] = 1.0
-            A[k, k] = 0.0
-            b = np.empty(k + 1)
-            b[:k] = g0
-            b[k] = 1.0
-            # An ordinary kriging estimate interpolates its neighbours and cannot
-            # legitimately fall outside their range. When it does, the system was
-            # degenerate: this happens where the search radius is large relative to
-            # the correlation range and the neighbours are packed tightly, so every
-            # pairwise semivariance is nearly identical and the matrix loses rank.
-            # On two of three calibration tiles -- ranges of 1.5 and 1.8 m against a
-            # 3 m floor, one of them at 10 points per square metre -- the lstsq
-            # fallback returned weights that produced values of order 1e15.
-            #
-            # The fallback is inverse-distance over the same neighbours: bounded by
-            # construction, and a defensible estimate for a cell whose neighbours
-            # carry no distinguishable spatial structure.
-            try:
-                w = np.linalg.solve(A, b)
-                est = float(w[:k] @ pz)
-                degenerate = not np.isfinite(est) or est < pz.min() or est > pz.max()
-            except np.linalg.LinAlgError:
-                degenerate = True
-            if degenerate:
-                dd = np.maximum(d[good], 1e-9)
-                ww = 1.0 / dd ** 2
-                est = float((ww @ pz) / ww.sum())
-                n_fallback += 1
-                # inverse distance carries no covariance model, so there is no
-                # variance to report. Left as nodata rather than filled with a
-                # number that would look like an uncertainty estimate.
-            else:
-                # ordinary kriging variance: the weights against the cell-to-point
-                # semivariances, plus the Lagrange multiplier. This is the quantity
-                # that distinguishes a modelled estimate from a weighted average,
-                # and it is what a fallback cell does not have.
-                var[c] = float(w[:k] @ g0 + w[k])
-            out[c] = est
-            filled += 1
+                dxy = np.hypot(px[:, :, None] - px[:, None, :],
+                               py[:, :, None] - py[:, None, :])
+                g0 = mdl(dd, *p)
+                A = np.empty((m, kval + 1, kval + 1))
+                A[:, :kval, :kval] = mdl(dxy, *p)
+                A[:, :kval, kval] = 1.0
+                A[:, kval, :kval] = 1.0
+                A[:, kval, kval] = 0.0
+                # Trailing axis kept explicit: numpy 2 reads a two-dimensional
+                # right-hand side as one matrix rather than a stack of vectors,
+                # so (m, k+1) would be misread as a single (m, k+1) system.
+                b = np.empty((m, kval + 1, 1))
+                b[:, :kval, 0] = g0
+                b[:, kval, 0] = 1.0
+
+                try:
+                    w = np.linalg.solve(A, b)[:, :, 0]
+                except np.linalg.LinAlgError:
+                    # One singular system in the stack fails the whole call, so
+                    # the batch is redone one at a time and the singular ones
+                    # are marked rather than losing the batch that contained
+                    # them. Rare: degeneracy here is usually caught by the
+                    # range test below, not by a raise.
+                    w = np.empty((m, kval + 1))
+                    singular = np.zeros(m, bool)
+                    for j in range(m):
+                        try:
+                            w[j] = np.linalg.solve(A[j], b[j])[:, 0]
+                        except np.linalg.LinAlgError:
+                            w[j] = 0.0
+                            singular[j] = True
+                else:
+                    singular = np.zeros(m, bool)
+
+                est = np.einsum("ij,ij->i", w[:, :kval], pz)
+                # An ordinary kriging estimate interpolates its neighbours and
+                # cannot legitimately fall outside their range. When it does the
+                # system was degenerate -- the search radius large against the
+                # correlation range, neighbours packed tightly, every pairwise
+                # semivariance nearly identical and the matrix short of rank.
+                # The fallback is inverse distance over the same neighbours:
+                # bounded by construction, and defensible for a cell whose
+                # neighbours carry no distinguishable spatial structure.
+                degenerate = (singular | ~np.isfinite(est)
+                              | (est < pz.min(1)) | (est > pz.max(1)))
+                if degenerate.any():
+                    ddg = np.maximum(dd[degenerate], 1e-9)
+                    ww = 1.0 / ddg ** 2
+                    est[degenerate] = ((ww * pz[degenerate]).sum(1)
+                                       / ww.sum(1))
+                    n_fallback += int(degenerate.sum())
+
+                good_cells = base + cells
+                out[good_cells] = est
+                # inverse distance carries no covariance model, so a fallback
+                # cell has no variance to report. Left as nodata rather than
+                # filled with a number that would look like an uncertainty.
+                keep = ~degenerate
+                if keep.any():
+                    var[good_cells[keep]] = (
+                        np.einsum("ij,ij->i", w[keep, :kval], g0[keep])
+                        + w[keep, kval])
+                filled += m
 
     dem = out.reshape(grid.height, grid.width)
     variance = var.reshape(grid.height, grid.width)

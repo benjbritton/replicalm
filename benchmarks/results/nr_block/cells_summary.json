@@ -1,0 +1,22 @@
+{
+ "scan": {
+  "cell_m": 20,
+  "tiles": 143,
+  "cells_scored": 63253,
+  "min_ground_returns_per_cell": 400
+ },
+ "coverage": {
+  "cells_with_3_strips": 12506,
+  "cells_with_2_strips": 29385,
+  "cells_with_1_strip": 21362
+ },
+ "populations": {
+  "flat_under_1p5pct_and_sd_under_6cm": 8388,
+  "forest_canopy_over_8m_and_35pct_above_2m": 6451
+ },
+ "understory_band_over_forest_cells": {
+  "median": 0.01,
+  "p90": 0.0324,
+  "max": 0.1563
+ }
+}

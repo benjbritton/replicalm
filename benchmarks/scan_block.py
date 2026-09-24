@@ -28,11 +28,13 @@ D = os.environ.get(
 # repository keeps is the subset covered by three or more strips -- the
 # requirement for any interswath comparison -- plus the denominators the
 # full scan supports.
-# The block's point clouds are Alec McLellan's, and nothing derived from
-# them is published without his approval, so results are written outside
-# the repository and the path is gitignored.
-RESULTS = os.environ.get("REPLICALM_NR_RESULTS",
-                        "C:/NR_Lidar/replicalm_results")
+# Results live in the repository now; McLellan gave permission to publish
+# measurements derived from the block on 2026-09-24. The environment
+# variable still overrides, for working outside a checkout.
+RESULTS = os.environ.get(
+    "REPLICALM_NR_RESULTS",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                 "results", "nr_block"))
 os.makedirs(RESULTS, exist_ok=True)
 OUT = os.path.join(TESTS, "nr_block", "cells.json")
 TRIM = os.path.join(RESULTS, "cells_3strip.json.gz")
