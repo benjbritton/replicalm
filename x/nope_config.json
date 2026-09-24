@@ -1,0 +1,97 @@
+{
+  "tile_km": null,
+  "buffer_m": 10.0,
+  "chunk_cells": 1000000,
+  "note": "",
+  "remove_low_noise": false,
+  "elm_cell_m": 10.0,
+  "elm_threshold_m": 1.0,
+  "remove_outliers": true,
+  "outlier_neighbours": 8,
+  "outlier_multiplier": 2.5,
+  "noise_class": 7,
+  "reset_classification": true,
+  "passes": [
+    {
+      "algorithm": "smrf",
+      "window_m": 70.0,
+      "slope": 0.1584,
+      "threshold_m": 0.25,
+      "scalar": 1.25,
+      "cell_m": 0.5,
+      "csf_resolution_m": 1.0,
+      "csf_rigidness": 2,
+      "csf_threshold_m": 0.5,
+      "reuse_ground": false,
+      "stands_in_for": "TerraScan pass 1: 70 m, 88 deg, 9 deg, 3 m; pass 2 dropped, see the note above"
+    }
+  ],
+  "hag_low_cut_m": -0.5,
+  "hag_high_cut_m": 600.0,
+  "near_ground_band_m": [
+    -0.2,
+    0.2
+  ],
+  "near_ground_class": 8,
+  "clean_vegetation": true,
+  "clean_patch_m": 0.75,
+  "clean_height_m": 0.2,
+  "clean_percentile": 10.0,
+  "las_version": "1.4",
+  "las_point_format": 6,
+  "las_compression": true,
+  "las_forward": "scale,offset",
+  "keep_classes": [
+    2,
+    8
+  ],
+  "interpolator": "kriging",
+  "variogram_model": "spherical",
+  "variogram_fit_lag_m": 5.0,
+  "cell_factor": 1.0,
+  "search_radius_m": null,
+  "search_radius_mode": "density",
+  "search_radius_factor": 4.0,
+  "search_radius_floor_m": 3.0,
+  "search_radius_ceiling_m": 20.0,
+  "max_points": 32,
+  "min_points": 3,
+  "dem_cell_m": 1.0,
+  "erode_m": null,
+  "erode_factor": 1.0,
+  "erode_cells": 0,
+  "ncalm_search_radius_m": 20.0,
+  "calib_min_coverage": 0.7,
+  "calib_min_ground_density": 2.5,
+  "calib_min_steep_fraction": 0.02,
+  "min_ground_points": 500,
+  "notes": "",
+  "_source_method": {
+    "pass_1": {
+      "window_m": 70.0,
+      "max_terrain_angle_deg": 88.0,
+      "iteration_angle_deg": 9.0,
+      "iteration_distance_m": 3.0
+    },
+    "pass_2": {
+      "window_m": 70.0,
+      "max_terrain_angle_deg": 88.0,
+      "iteration_angle_deg": 12.0,
+      "iteration_distance_m": 3.0
+    },
+    "tile_km": 1.0,
+    "macro_tile_km": 20.0,
+    "buffer_m": 10.0,
+    "hag_low_cut_m": -0.5,
+    "hag_high_cut_m": 600.0,
+    "near_ground_band_m": [
+      -0.2,
+      0.2
+    ],
+    "near_ground_class": 8,
+    "kriging_search_radius_m": 20.0,
+    "dem_cell_m": 1.0,
+    "output_las_version": "1.2",
+    "source": "Estrada-Belli et al. 2025 supplementary materials, quoting Estrada-Belli et al. 2023, J. Archaeological Science 157:105835"
+  }
+}

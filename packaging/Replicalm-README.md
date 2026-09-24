@@ -79,6 +79,9 @@ else — vegetation, a building, a wire.
 `auto` uses the method's own value: **0.25 m for Clear and Deep**, 0.50 m for
 Baseline, which is the figure the published workflow specifies.
 
+The same discipline applies as to the search neighbours: change it when the
+data gives you a reason, and put the reason in the **Reason for changing** box.
+
 Raise it — 0.5 m, or higher on rugged ground — if the model looks scraped, with
 ridge crests flattened or small rises missing. Lower it if flat ground comes out
 speckled, or if low scrub is showing up as terrain. The two failures look quite
@@ -108,9 +111,16 @@ surveys where that distance is short the setting is inert.
 
 It starts to matter on smooth ground, where points stay similar over long
 distances and a larger neighbourhood genuinely averages more terrain, and on
-sparse surveys where every neighbour still falls inside that distance. If you
-are working on such data and the surface looks noisier or smoother than it
-should, this is the setting to try.
+sparse surveys where every neighbour still falls inside that distance.
+
+Change it only for such a reason, and write the reason down. The defaults are
+what the published method specifies and what every measurement behind this tool
+was taken at, so departing from them is a claim about your survey rather than a
+preference — that its structure differs in some way the default does not suit.
+The **Reason for changing** box records that claim in the settings file beside
+the output, where anyone reading the result later can see both what was changed
+and why. A result produced with altered settings and no stated reason cannot be
+defended afterwards, including by you.
 
 ### About cell size
 

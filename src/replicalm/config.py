@@ -139,6 +139,15 @@ class ReplicalmConfig:
     buffer_m: float = NCALM_TERRASCAN["buffer_m"]
     chunk_cells: int = 1000000           # cells per neighbour query batch
 
+    # Why this run departed from its method's defaults, in the operator's own
+    # words. The defaults are what the source specifies and what every
+    # measurement in docs/ was taken at, so a departure is a claim about the
+    # survey -- that its correlation structure, vegetation or relief differs in
+    # some way that the default does not suit. Recording the claim beside the
+    # product is what makes the departure auditable rather than merely visible.
+    # Empty on a default run.
+    note: str = ""
+
     # noise removal, before classification
     #
     # The source method removes outliers at step 6, by height above the ground

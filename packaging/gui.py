@@ -63,6 +63,7 @@ class App(tk.Tk):
         self.threshold = tk.StringVar(value="auto")
         self.maxpts = tk.StringVar(value="auto")
         self.minpts = tk.StringVar(value="auto")
+        self.reason = tk.StringVar()
         self.g1 = tk.BooleanVar(value=False)
         self.keep = tk.BooleanVar(value=False)
 
@@ -125,6 +126,14 @@ class App(tk.Tk):
                                                               padx=(6, 10))
         ttk.Label(nb, text="'auto' uses the method's own values",
                   foreground="#444").pack(side="left")
+
+        # A departure from the defaults is a claim about this survey, so the
+        # window asks for it in words and stores the answer beside the output.
+        rs = ttk.Frame(frm)
+        rs.grid(row=5, column=1, sticky="ew", pady=(6, 0))
+        ttk.Label(rs, text="Reason for changing").pack(side="left")
+        ttk.Entry(rs, textvariable=self.reason).pack(side="left", fill="x",
+                                                     expand=True, padx=(6, 0))
 
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=10)
@@ -255,18 +264,37 @@ class App(tk.Tk):
                                       "the maximum.")
             return
 
+        # Not enforced -- a required box teaches people to type a full stop --
+        # but asked for once, and recorded either way.
+        changed = [n for n, v in (("method", self.profile.get() != "Clear"),
+                                  ("cell size", cell is not None),
+                                  ("ground threshold", threshold is not None),
+                                  ("search neighbours",
+                                   maxpts is not None or minpts is not None))
+                   if v]
+        if changed and not self.reason.get().strip():
+            gap = "\n\n"
+            if not messagebox.askokcancel(
+                    APP,
+                    "You have changed %s from the default." % " and ".join(changed)
+                    + gap
+                    + "The defaults are what the published method specifies. If this survey needs something else, saying why in the Reason box records it beside the output."
+                    + gap + "Run anyway?"):
+                return
+
         self.run_btn.configure(state="disabled")
         self.progress["value"] = 0.0
         self._say("")
         self.worker = threading.Thread(
             target=self._work, args=(las, out, cell, self.g1.get(),
                                      self.keep.get(), self.profile.get(),
-                                     threshold, maxpts, minpts),
+                                     threshold, maxpts, minpts,
+                                     self.reason.get().strip()),
             daemon=True)
         self.worker.start()
 
     def _work(self, las, out, cell, make_g1, keep, profile, threshold,
-              maxpts, minpts):
+              maxpts, minpts, reason):
         q = self.messages
 
         def progress(stage, message, fraction=None):
@@ -293,6 +321,9 @@ class App(tk.Tk):
                               else cfg.min_points)
             q.put(("log", "baseline locked %s" % BASELINE["locked"]))
             q.put(("log", "method: %s -- %s" % (profile, note)))
+            if reason:
+                cfg = replace(cfg, note=reason)
+                q.put(("log", "reason recorded: %s" % reason))
             q.put(("log", "search neighbours: %d max, %d min"
                           % (cfg.max_points, cfg.min_points)))
             q.put(("log", "ground threshold: %s m"

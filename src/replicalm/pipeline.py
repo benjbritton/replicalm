@@ -261,6 +261,9 @@ def main(argv=None):
     p.add_argument("--min-points", type=int, default=None, metavar="N",
                    help="fewest neighbours before a cell is left empty "
                         "(profile default: 1 for baseline, 3 otherwise)")
+    p.add_argument("--reason", default=None, metavar="TEXT",
+                   help="why this run departs from the method's defaults. "
+                        "Recorded in the settings file beside the output")
     a = p.parse_args(argv)
 
     cfg = PRESETS[a.preset]
@@ -272,6 +275,22 @@ def main(argv=None):
         if mn > mx:
             p.error("--min-points (%d) cannot exceed --max-points (%d)" % (mn, mx))
         cfg = replace(cfg, max_points=mx, min_points=mn)
+
+    # A departure from the defaults is a claim about the survey. The run is not
+    # blocked for want of a reason -- that would only teach people to type
+    # anything -- but an unexplained departure is called out here and left
+    # blank in the settings file, where its absence is as visible as its
+    # presence would have been.
+    overrides = [n for n, v in (("--threshold", a.threshold),
+                                ("--max-points", a.max_points),
+                                ("--min-points", a.min_points)) if v is not None]
+    if a.reason:
+        cfg = replace(cfg, note=a.reason)
+    elif overrides:
+        print("NOTE: %s set without --reason. The defaults are what the source "
+              "specifies and what the published measurements were taken at; a "
+              "departure should say why, and the settings file will record that "
+              "it did not." % ", ".join(overrides))
     if a.threshold is not None:
         if a.threshold <= 0:
             p.error("--threshold must be positive")
