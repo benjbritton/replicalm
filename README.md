@@ -204,7 +204,7 @@ the command line.
 **Built:** `packaging\dist\Replicalm-1.0.0-setup.exe`, 1.15 GB, roughly 4 GB
 installed. The staged build is tested end to end — it processes a tile and
 writes a correctly projected raster from its own bundled PDAL, GDAL and PROJ.
-Rebuild with `.uild.ps1`; see [packaging/README.md](packaging/README.md).
+Rebuild with `.\build.ps1`; see [packaging/README.md](packaging/README.md).
 
 ## The locked baseline
 
