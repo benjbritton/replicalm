@@ -29,12 +29,19 @@ early keeps every worker busy to the end, instead of leaving one straggler
 running alone after the others have drained.
 """
 import argparse
+import concurrent.futures as cf
 import glob
 import json
 import multiprocessing as mp
 import os
 import time
 import traceback
+
+# Peak resident memory per tile, as a multiple of its file size. Measured,
+# not guessed: a 2.0 GB LAS held 11.6 GB while classifying, a ratio of 5.8.
+# Eight is that with margin -- overestimating costs a slower run, and
+# underestimating killed one.
+MEMORY_FACTOR = 8.0
 
 
 def _tile_key(path):
@@ -100,9 +107,40 @@ def _save(manifest_path, records):
     os.replace(tmp, manifest_path)
 
 
+def _budget_bytes(explicit_gb=None):
+    """How much memory the run may commit to tiles at once."""
+    if explicit_gb:
+        return int(explicit_gb * (1 << 30))
+    try:
+        import ctypes
+
+        class MS(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong),
+                        ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong),
+                        ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong),
+                        ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong),
+                        ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+
+        st = MS()
+        st.dwLength = ctypes.sizeof(MS)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st))
+        if st.ullTotalPhys:
+            # Three quarters. The rest is the operating system, this process,
+            # and whatever else the machine is doing.
+            return int(st.ullTotalPhys * 0.75)
+    except Exception:
+        pass
+    return 32 * (1 << 30)
+
+
+
 def run(las_paths, out_dir, preset="clear", workers=None, cell_m=None,
         make_g1=False, keep_ground=False, rvt_script=None, redo=False,
-        manifest=None, verbose=True):
+        manifest=None, verbose=True, memory_gb=None):
     """Process every tile in `las_paths`. Returns the manifest dict."""
     os.makedirs(out_dir, exist_ok=True)
     manifest = manifest or os.path.join(out_dir, "batch_manifest.json")
@@ -127,31 +165,71 @@ def run(las_paths, out_dir, preset="clear", workers=None, cell_m=None,
     if not todo:
         return records
 
-    jobs = [(p, out_dir, preset, cell_m, make_g1, keep_ground, rvt_script)
-            for p in todo]
-    t0, n_ok, n_bad = time.time(), 0, 0
-    with mp.Pool(processes=workers, maxtasksperchild=1) as pool:
-        for i, rec in enumerate(pool.imap_unordered(_one, jobs), 1):
-            records[rec["tile"]] = rec
-            _save(manifest, records)
-            if rec["status"] == "done":
-                n_ok += 1
-                msg = ("%d pts, %.2f/m2, cell %.2f m, %d cells, %.0f%% idw, "
-                       "%.0f s"
-                       % (rec["ground_points"], rec["density"], rec["cell_m"],
-                          rec["cells_after_trim"],
-                          100 * rec.get("fallback_fraction", 0.0),
-                          rec["seconds"]))
-            else:
-                n_bad += 1
-                msg = "FAILED %s" % rec["error"][:80]
-            if verbose:
-                elapsed = time.time() - t0
-                eta = elapsed / i * (len(jobs) - i)
-                print("[%4d/%d] %-34s %s  (elapsed %.1f h, eta %.1f h)"
-                      % (i, len(jobs), rec["tile"], msg,
-                         elapsed / 3600, eta / 3600), flush=True)
+    budget = _budget_bytes(memory_gb)
+    charge = {q: os.path.getsize(q) * MEMORY_FACTOR for q in todo}
     if verbose:
+        print("memory budget %.0f GB; largest tile charged %.1f GB"
+              % (budget / (1 << 30), max(charge.values()) / (1 << 30)),
+              flush=True)
+
+    t0, n_ok, n_bad, done_n = time.time(), 0, 0, 0
+    pending, running, committed = list(todo), {}, 0
+    total = len(pending)
+    with cf.ProcessPoolExecutor(max_workers=workers,
+                                max_tasks_per_child=1) as pool:
+        while pending or running:
+            # Start whatever fits. A tile may always run alone, however large,
+            # so an oversized one cannot wedge the queue behind a budget it
+            # could never satisfy.
+            while pending and len(running) < workers:
+                nxt = pending[0]
+                if running and committed + charge[nxt] > budget:
+                    break
+                pending.pop(0)
+                committed += charge[nxt]
+                fut = pool.submit(_one, (nxt, out_dir, preset, cell_m, make_g1,
+                                         keep_ground, rvt_script))
+                running[fut] = nxt
+            finished, _ = cf.wait(running, return_when=cf.FIRST_COMPLETED)
+            for fut in finished:
+                path = running.pop(fut)
+                committed -= charge[path]
+                try:
+                    rec = fut.result()
+                except BaseException as exc:
+                    rec = {"tile": _tile_key(path), "las": str(path),
+                           "status": "failed",
+                           "error": "worker died: %s" % exc}
+                records[rec["tile"]] = rec
+                _save(manifest, records)
+                done_n += 1
+                if rec["status"] == "done":
+                    n_ok += 1
+                    msg = ("%d pts, %.2f/m2, cell %.2f m, %d cells, %.0f%% idw,"
+                           " %.0f s"
+                           % (rec["ground_points"], rec["density"],
+                              rec["cell_m"], rec["cells_after_trim"],
+                              100 * rec.get("fallback_fraction", 0.0),
+                              rec["seconds"]))
+                else:
+                    n_bad += 1
+                    msg = "FAILED " + str(rec.get("error", ""))[:80]
+                if verbose:
+                    elapsed = time.time() - t0
+                    eta = elapsed / done_n * (total - done_n)
+                    print("[%4d/%d] %-34s %s  (%d running, %.0f GB, "
+                          "elapsed %.1f h, eta %.1f h)"
+                          % (done_n, total, rec["tile"], msg, len(running),
+                             committed / (1 << 30), elapsed / 3600,
+                             eta / 3600), flush=True)
+
+    if verbose:
+        fin = [r for r in records.values() if r.get("status") == "done"]
+        if fin:
+            fb = sorted(r.get("fallback_fraction", 0.0) for r in fin)
+            print("\ninverse-distance fallback over %d tiles: median %.1f%%, p90 %.1f%%, max %.1f%%"
+                  % (len(fb), 100 * fb[len(fb) // 2],
+                     100 * fb[int(0.9 * (len(fb) - 1))], 100 * fb[-1]))
         print("\n%d done, %d failed, %.2f h total"
               % (n_ok, n_bad, (time.time() - t0) / 3600))
         for k, r in sorted(records.items()):
@@ -178,6 +256,9 @@ def main(argv=None):
     p.add_argument("--keep-ground", action="store_true",
                    help="keep the classified point cloud for each tile")
     p.add_argument("--rvt-script", default=None)
+    p.add_argument("--memory-gb", type=float, default=None,
+                   help="memory the run may commit at once "
+                        "(default: three quarters of installed RAM)")
     p.add_argument("--redo", action="store_true",
                    help="reprocess tiles already recorded as done")
     a = p.parse_args(argv)
@@ -196,7 +277,7 @@ def main(argv=None):
 
     run(paths, a.out, preset=a.preset, workers=a.workers, cell_m=a.cell,
         make_g1=a.g1, keep_ground=a.keep_ground, rvt_script=a.rvt_script,
-        redo=a.redo)
+        redo=a.redo, memory_gb=a.memory_gb)
     return 0
 
 
