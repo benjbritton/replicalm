@@ -176,7 +176,8 @@ def fit_variogram(x, y, z, model="spherical", n_lags=12, max_lag=None,
 
 def krige_grid(x, y, z, grid, radius=20.0, max_points=32, min_points=3,
                model="spherical", variogram=None, nodata=-9999.0,
-               verbose=True, chunk_cells=1000000, solve_batch=50000):
+               verbose=True, chunk_cells=1000000, solve_batch=50000,
+               ridge_fraction=1e-6):
     """Ordinary kriging of scattered points onto a declared grid.
 
     Cells with fewer than `min_points` neighbours inside the radius are left as
@@ -190,10 +191,50 @@ def krige_grid(x, y, z, grid, radius=20.0, max_points=32, min_points=3,
     if len(z) < min_points:
         raise KrigingError("only %d points supplied" % len(z))
 
+    # DUPLICATE LOCATIONS MAKE THE SYSTEM EXACTLY SINGULAR
+    #
+    # Two returns at one XY give the kriging matrix two identical rows, which no
+    # nugget, ridge or neighbour count can rescue -- the matrix has no inverse,
+    # and every cell whose neighbourhood contains such a pair falls out of the
+    # solve. The delivered G-LiHT tiles carry them: 13.05% of the returns on one
+    # tile are exact XYZ repeats, same return number, same GPS time, same source,
+    # while another tile has none. It is a property of the archive, not of the
+    # processing, and it accounted for 89% of that tile's cells abandoning
+    # kriging for inverse distance.
+    #
+    # Exact repeats carry no information, so removing them costs nothing. Where
+    # the same XY holds different elevations -- 0.1% of groups -- the lowest is
+    # kept, because a ground surface cannot pass through two heights at one
+    # place and the lower return is the ground candidate.
+    order = np.lexsort((z, y, x))
+    x, y, z = x[order], y[order], z[order]
+    first = np.ones(len(z), bool)
+    if len(z) > 1:
+        first[1:] = (x[1:] != x[:-1]) | (y[1:] != y[:-1])
+    n_dropped = int(len(z) - first.sum())
+    if n_dropped:
+        x, y, z = x[first], y[first], z[first]
+    if len(z) < min_points:
+        raise KrigingError("only %d distinct locations after de-duplication"
+                           % len(z))
+
     if variogram is None:
         variogram = fit_variogram(x, y, z, model=model, max_lag=radius)
     mdl = MODELS[variogram["model"]]
     p = variogram["params"]
+
+    # THE SYSTEM IS BUILT FROM COVARIANCES, NOT SEMIVARIANCES
+    #
+    # The two are algebraically equivalent -- C(h) = C(0) - gamma(h) gives the
+    # same weights -- but not numerically. With semivariances the diagonal is
+    # gamma(0) = 0 while the off-diagonals carry the nugget, so a nugget makes
+    # the matrix more nearly constant and conditions it worse. With covariances
+    # the diagonal is the total sill and exceeds the off-diagonals by exactly
+    # the nugget, which is the diagonal dominance that conditions it. This is
+    # where a nugget belongs, and why one had no effect while the system was
+    # written the other way.
+    c0_sill = float(p[0] + p[1]) if len(p) > 1 else 1.0
+    ridge = ridge_fraction * c0_sill
 
     tree = cKDTree(np.c_[x, y])
     n_cells = grid.height * grid.width
@@ -261,9 +302,16 @@ def krige_grid(x, y, z, grid, radius=20.0, max_points=32, min_points=3,
 
                 dxy = np.hypot(px[:, :, None] - px[:, None, :],
                                py[:, :, None] - py[:, None, :])
-                g0 = mdl(dd, *p)
+                # covariances, and the cell-to-point right-hand side with them
+                c_0 = c0_sill - mdl(dd, *p)
                 A = np.empty((m, kval + 1, kval + 1))
-                A[:, :kval, :kval] = mdl(dxy, *p)
+                A[:, :kval, :kval] = c0_sill - mdl(dxy, *p)
+                # A small ridge on the diagonal, a fraction of the sill, guards
+                # whatever ill-conditioning survives de-duplication. Inert where
+                # the system already solves.
+                if ridge:
+                    dg = np.arange(kval)
+                    A[:, dg, dg] += ridge
                 A[:, :kval, kval] = 1.0
                 A[:, kval, :kval] = 1.0
                 A[:, kval, kval] = 0.0
@@ -271,7 +319,7 @@ def krige_grid(x, y, z, grid, radius=20.0, max_points=32, min_points=3,
                 # right-hand side as one matrix rather than a stack of vectors,
                 # so (m, k+1) would be misread as a single (m, k+1) system.
                 b = np.empty((m, kval + 1, 1))
-                b[:, :kval, 0] = g0
+                b[:, :kval, 0] = c_0
                 b[:, kval, 0] = 1.0
 
                 try:
@@ -318,9 +366,12 @@ def krige_grid(x, y, z, grid, radius=20.0, max_points=32, min_points=3,
                 # filled with a number that would look like an uncertainty.
                 keep = ~degenerate
                 if keep.any():
+                    # ordinary kriging variance in covariance form:
+                    # C(0) - sum(w_i C_i0) - mu
                     var[good_cells[keep]] = (
-                        np.einsum("ij,ij->i", w[keep, :kval], g0[keep])
-                        + w[keep, kval])
+                        c0_sill
+                        - np.einsum("ij,ij->i", w[keep, :kval], c_0[keep])
+                        - w[keep, kval])
                 filled += m
 
     dem = out.reshape(grid.height, grid.width)

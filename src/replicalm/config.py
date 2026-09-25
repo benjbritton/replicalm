@@ -372,7 +372,7 @@ class ReplicalmConfig:
 # steep ground, and all three were wrong.
 
 BASELINE = {
-    "locked": "2026-09-24",
+    "locked": "2026-09-23",
     "algorithm": "smrf",
     "passes": 1,
     "slope": 0.1584,            # tan 9 deg, the source's pass-1 iteration angle
@@ -400,9 +400,9 @@ BASELINE = {
         # differ from its target in the size of the neighbourhood it averages.
         "baseline": {"threshold_m": 0.50, "clean_vegetation": False,
                      "max_points": 64, "min_points": 1},
-        "clear":    {"threshold_m": 0.25, "clean_vegetation": True,
+        "clear":    {"threshold_m": 0.50, "clean_vegetation": True,
                      "max_points": 16, "min_points": 3},
-        "deep":     {"threshold_m": 0.25, "clean_vegetation": True,
+        "deep":     {"threshold_m": 0.50, "clean_vegetation": True,
                      "max_points": 16, "min_points": 3},
     },
 }
@@ -487,7 +487,7 @@ PRESETS = {
     # l8s431) and Clear still finds 6 to 12% afterwards. Together they put bias
     # within 3.3 mm of zero on all three tiles, the best of any arm, with no
     # sign of the overshoot that compounding two removals might have produced.
-    "clear": ReplicalmConfig(passes=[replace(_PASS, threshold_m=0.25)]),
+    "clear": ReplicalmConfig(),
 
     # The translation alone, with nothing removed beyond what the source method
     # removes. This is what the published comparison figures are measured
@@ -498,8 +498,7 @@ PRESETS = {
 
     # Clear on a grid finer than the point spacing. The extra resolution is for
     # rendering, not for accuracy -- see cell_factor.
-    "deep": ReplicalmConfig(cell_factor=0.7,
-                            passes=[replace(_PASS, threshold_m=0.25)]),
+    "deep": ReplicalmConfig(cell_factor=0.7),
     "ncalm_csf": ReplicalmConfig(passes=[
         GroundPass(algorithm="csf", csf_rigidness=2, csf_threshold_m=0.5,
                    stands_in_for="TerraScan pass 1, via cloth simulation"),
