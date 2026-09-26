@@ -22,3 +22,4 @@
 *.tiff  binary
 *.ovr   binary
 *.gz    binary
+*.npz   binary

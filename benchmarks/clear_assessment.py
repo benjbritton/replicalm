@@ -25,7 +25,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paths import SRC, TESTS
 sys.path.insert(0, SRC)
 import numpy as np
-from replicalm import calibrate, classify, grid as G, interpolate, kriging as K
+from replicalm import (calibrate, classify, finalise, grid as G, interpolate,
+                       kriging as K)
 from replicalm.config import PRESETS, BASELINE, verify_baseline
 
 OUT = os.path.join(TESTS, "clear_assessment")
@@ -70,8 +71,16 @@ for tile in ("l0s395", "l8s431", "l0s444"):
                              max_points=cfg.max_points,
                              min_points=cfg.min_points, variogram=v,
                              verbose=False)
+    # Finalise, as the shipped pipeline does: fill the holes kriging leaves
+    # inside coverage, trim the edge back by the search radius so the surface
+    # does not extend past the returns that support it, and write with the
+    # nodata convention. Skipping it -- which an earlier version of this script
+    # did -- leaves a raw kriged grid whose edges reach beyond the data and
+    # whose gaps are untreated, and renders visualizations from that.
     dem_p = os.path.join(OUT, tile + "_clear.tif")
-    K.write_geotiff(dem, g, wkt, dem_p)
+    fin = finalise.finalise(dem, g, wkt, dem_p, radius_m=RADIUS[tile],
+                            nodata_in=-9999.0, erode_factor=cfg.erode_factor,
+                            verbose=False)
     sc = calibrate.compare_to_reference(dem_p, c["clipped_reference"])
     secs = time.time() - t0
     ratio = sc["complexity_candidate"] / sc["complexity_reference"]
@@ -80,10 +89,17 @@ for tile in ("l0s395", "l8s431", "l0s444"):
                  "clear_removed_pct": round(100 * report["fraction"], 2),
                  "fallback_fraction": info["fallback_fraction"],
                  "variogram_range_m": float(info["params"][2]),
-                 "seconds": round(secs, 1), "ratio": ratio, **sc})
+                 "seconds": round(secs, 1), "ratio": ratio,
+                 "filled_cells": fin["filled_cells"], "holes": fin["holes"],
+                 "erode_cells": fin["erode_cells"],
+                 "cells_after_trim": fin["cells_after_trim"], **sc})
     print("%-8s %9d %8d %6.1f%% %7.2f%% %9.4f %+9.4f %7.2fx %7.0f"
           % (tile, len(x), dropped, 100 * info["fallback_fraction"],
              100 * report["fraction"], sc["rmse_m"], sc["bias_m"], ratio, secs),
+          flush=True)
+    print("         finalise: %d holes filled (%d cells), edge trimmed %d cells, "
+          "%d cells kept" % (fin["holes"], fin["filled_cells"],
+                             fin["erode_cells"], fin["cells_after_trim"]),
           flush=True)
 
 with open(os.path.join(OUT, "clear_assessment.json"), "w", encoding="utf-8") as fh:
