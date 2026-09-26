@@ -13,8 +13,10 @@ a neighbouring pass does not read as independent coverage.
 import glob, gzip, json, os, sys, time
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from paths import ROOT, TESTS
+from paths import ensure_blas, ROOT, TESTS
 sys.path.insert(0, os.path.join(ROOT, "src"))
+
+ensure_blas()
 import pdal
 from replicalm.classify import las_reader
 

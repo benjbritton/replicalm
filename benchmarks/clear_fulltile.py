@@ -86,6 +86,31 @@ def visualize(dem_path, tile_dir, tile):
     return rvt_root, sorted(made), proc.returncode
 
 
+MANIFEST = os.path.join(OUT, "clear_fulltile.json")
+
+
+def save(rows):
+    """Merge this run's rows into the manifest, keyed by tile.
+
+    Rebuilt from empty, this file records only whatever the last invocation
+    happened to process. That is how l0s395's row came to describe North2: a
+    three-tile run overwrote a corrected single-tile one, and the record then
+    named a LAS that was never processed into the DEM sitting beside it. Rows
+    for tiles this run did not touch are preserved.
+    """
+    keep = {}
+    if os.path.exists(MANIFEST):
+        try:
+            with open(MANIFEST, encoding="utf-8") as fh:
+                keep = {r["tile"]: r for r in json.load(fh)}
+        except (ValueError, KeyError):
+            keep = {}          # unreadable is not a reason to lose this run
+    for r in rows:
+        keep[r["tile"]] = r
+    with open(MANIFEST, "w", encoding="utf-8") as fh:
+        json.dump([keep[k] for k in sorted(keep)], fh, indent=1, default=float)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--tiles", nargs="*", default=sorted(TILES))
@@ -144,9 +169,7 @@ def main(argv=None):
               % (rec["seconds"], 100 * rec["fallback_fraction"],
                  rec["cells_after_trim"] or 0), flush=True)
         rows.append(rec)
-        with open(os.path.join(OUT, "clear_fulltile.json"), "w",
-                  encoding="utf-8") as fh:
-            json.dump(rows, fh, indent=1, default=float)
+        save(rows)
 
     print("\n%-8s %10s %7s %6s %7s %9s %9s %7s %8s"
           % ("tile", "ground", "pts/m2", "cell", "idw %", "rmse m", "bias m",

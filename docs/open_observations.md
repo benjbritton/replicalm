@@ -360,7 +360,9 @@ not determinable from the g1 sources, and should not be guessed at.
 
 ## 12. Which filter is deceived by understory, measured without ground truth
 
-**Status:** open, and the Optimization work rests on it.
+**Status:** open, and the Optimization work rests on it. **Revised 2026-09-26:
+the PMF row of the table below is not safe** -- see "The 0.53 m gap was our
+parameters" at the end of this observation. The SMRF and CSF rows stand.
 
 Across 41 flat cells in the New River block (slope under 2%, three overlapping
 strips, band fraction 3.1 to 13.2%), each filter's surface was measured against
@@ -406,5 +408,81 @@ where nothing is standing -- rather than asserted.
 **What is still open.** How far above the soil any filter sits; whether PMF is
 right or merely anchored to the minimum surface, holding a near-constant 0.20 m
 above the lowest returns. Those need surveyed control.
+
+
+### The 0.53 m gap was our parameters, not a property of PMF
+
+A four-rung ladder was built on 2026-09-26 to measure filter divergence against
+a noise floor: bare ground, low understory, closed forest, tall scrub, each
+covered by three overlapping strips, each filter run pooled and then on every
+strip alone. The spread of the three single-strip surfaces is the survey's own
+measurement and processing noise, so a divergence smaller than that spread is
+not a difference.
+
+Selecting the rungs corrected an earlier error. The cells previously used for
+low understory were not understory: 82% and 75% of their returns stood above
+5 m, so they were a second pair of forest cells carrying a trace of material
+underneath. The replacement at 320030.5 E, 1968030.4 N (UTM 16N) has nothing
+above 2 m and a third of its returns between 0.20 and 0.35 m, and all three
+strips see it alike -- 33.9, 32.5 and 33.8%.
+
+On the first run PMF returned **0 ground points** in the forest cell and 32 in
+tall scrub, and sat 0.53 m below SMRF and CSF on low understory at a third of
+their density. Sweeping `filters.pmf` directly over 36 combinations on every
+rung showed that was starvation, not discrimination. Replicalm's `GroundPass`
+exposes three of PDAL's knobs and leaves `initial_distance` at its default of
+0.15 m; raising it to 0.5 and `max_distance` to 1.5 recovers ground density
+within 0.1 points per m2 of SMRF on three rungs.
+
+With PMF given enough tolerance to accept ground, **all three filters place the
+surface at the same elevation on every rung, at or below that rung's noise
+floor**:
+
+| rung | floor | SMRF-PMF | SMRF-CSF | PMF at tight settings |
+|---|---|---|---|---|
+| bare | 0.050 m | 0.000 | 0.000 | 0.000 |
+| low understory | 0.061 m | 0.000 | 0.000 | **-0.530** |
+| forest | 0.112 m | 0.000 | 0.050 | no ground recovered |
+| tall scrub | 0.143 m | -0.050 | -0.170 | no ground recovered |
+
+The only divergence that approaches its floor is CSF against SMRF on tall
+scrub, 0.170 m against 0.143 m, and one cell at 1.19 times the floor is not a
+result.
+
+**What this does and does not overturn.** The 45-cell regression above ran PMF
+at those same tight settings, and its measured density response -- -0.06 returns
+per m2 per 10% band -- is what a starved filter looks like: it recovered almost
+nothing, so it had almost nothing to rise with. A filter that classifies little
+as ground cannot be shown to be undeceived by understory. That row needs
+re-running with the tuned parameters before it can be quoted. The SMRF and CSF
+rows are unaffected: neither was starved, and both rose with the band.
+
+**Clear's threshold does not recover ground from understory.** On the understory
+rung the cleanup removes 2.7% of SMRF's ground and moves the surface 1 cm. On
+bare ground it removes 0.1% and moves nothing, which is the control working. Its
+visible effect is on tall scrub, 37 to 41% removed for a 6 to 7 cm shift. The
+0.20 m threshold is therefore not the mechanism by which low vegetation is
+separated from ground, and any claim that it is should be withdrawn.
+
+**Where the band's lower bound comes from.** The bare control settles the
+question left open above. On ground with nothing standing on it, 0.17% of
+returns exceed 0.15 m and 0.04% exceed 0.20 m. So 0.20 m sits well clear of the
+measurement noise and 0.15 m is a defensible lower bound rather than an
+inherited one.
+
+**Agreement is not accuracy, and this is where the work stops without control.**
+Three independent algorithms converging on the same surface to within 5 cm on
+bare ground and 0 cm under understory establishes precision, not correctness.
+All three could sit equally above the soil under vegetation, and nothing in a
+point cloud can distinguish that case from all three being right. Resolving it
+needs an external datum: a GPS rover on site, the pole tip on the soil beneath a
+scrub patch and again on the vegetation top at the same spot, on the rungs whose
+coordinates are recorded here. That is the single measurement that would convert
+the project's strongest precision result into an accuracy result, and it is
+named here as future work rather than claimed.
+
+Method and results: `benchmarks/band_profile.py`, `benchmarks/ladder.py`,
+`benchmarks/pmf_tune.py`, with `benchmarks/results/nr_block/band_profile.json`,
+`ladder.json` and `pmf_tune.json`.
 
 Point clouds by Alec McLellan; published with his permission.

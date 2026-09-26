@@ -70,9 +70,16 @@ LAS_ROOT = os.environ.get("REPLICALM_LAS_ROOT") or os.path.join(
 
 # Tools the pipeline can call but does not require. Overridable because their
 # install location is a property of the machine, not of the method.
-ARCGIS_PYTHON = os.environ.get(
+#
+# PDAL_PYTHON is the interpreter that carries PDAL. On this machine that is
+# the one shipped with ArcGIS Pro. The conda `replicalm` environment has
+# PDAL too, but its BLAS is broken -- see ensure_blas below -- so it is not
+# the default. ARCGIS_PYTHON is kept as the old name so existing callers
+# keep working.
+PDAL_PYTHON = os.environ.get(
     "REPLICALM_PDAL_PYTHON",
     r"C:\Program Files\ArcGIS\Pro\bin\Python\envs\arcgispro-py3\python.exe")
+ARCGIS_PYTHON = PDAL_PYTHON
 CLOUDCOMPARE = os.environ.get(
     "REPLICALM_CLOUDCOMPARE",
     r"C:\Program Files\CloudCompare\CloudCompare.exe")
@@ -103,6 +110,34 @@ def tokenise(path):
     return s
 
 
+def ensure_blas():
+    """Stop with an actionable message if this interpreter's BLAS is broken.
+
+    The conda `replicalm` environment on this machine has a LAPACK/BLAS that
+    aborts the process on any matmul or lstsq: Windows exception 0xc06d007f,
+    exit 127, no traceback, and buffered stdout lost with it. A script that hits
+    it appears to stop partway through for no reason, which cost an hour once.
+
+    It cannot be tested in process, because the test is the crash. So the probe
+    runs in a subprocess of this same interpreter, and costs about a third of a
+    second.
+    """
+    import subprocess
+    probe = "import numpy as np; np.ones((3, 3)) @ np.ones((3, 3))"
+    try:
+        r = subprocess.run([sys.executable, "-c", probe],
+                           capture_output=True, timeout=120)
+    except Exception:
+        return True                      # cannot probe; do not block the run
+    if r.returncode == 0:
+        return True
+    raise SystemExit(
+        "Replicalm: this interpreter's BLAS is broken -- a 3x3 matmul aborts it "
+        "(exit %d).\n  running  : %s\n  use      : %s\n\n"
+        "Override with REPLICALM_PDAL_PYTHON."
+        % (r.returncode, sys.executable, PDAL_PYTHON))
+
+
 def ensure(*roots):
     """Check the data roots exist, naming the variable to set if they do not."""
     hint = {DEM_ROOT: "REPLICALM_DEM_ROOT", LAS_ROOT: "REPLICALM_LAS_ROOT",
@@ -122,7 +157,7 @@ def describe():
     print("Replicalm paths")
     print("-" * 46)
     for name in ("ROOT", "SRC", "BENCHMARKS", "RESULTS", "TESTS",
-                 "DATA", "DEM_ROOT", "LAS_ROOT"):
+                 "DATA", "DEM_ROOT", "LAS_ROOT", "PDAL_PYTHON"):
         value = globals()[name]
         mark = "" if os.path.exists(value) else "   (missing)"
         print("  %-11s %s%s" % (name, value, mark))
