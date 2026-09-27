@@ -114,6 +114,10 @@ def save(rows):
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--tiles", nargs="*", default=sorted(TILES))
+    ap.add_argument("--on-grid", action="store_true",
+                    help="also build a second DEM on the archive's own lattice "
+                         "and score against that, since a production raster and "
+                         "an archive raster never share a grid")
     a = ap.parse_args(argv)
 
     cfg = PRESETS["clear"]
@@ -137,7 +141,7 @@ def main(argv=None):
             print("  [%-11s] %s" % (stage, message), flush=True)
 
         out = pipeline.process(las, tile_dir, cfg=cfg, make_g1=False,
-                               keep_ground=False, progress=show)
+                               keep_ground=bool(a.on_grid), progress=show)
         rec = {"tile": tile, "las": las, "reference": ref,
                "ground_points": out["ground_points"],
                "density": round(out["density"], 3),
@@ -149,8 +153,38 @@ def main(argv=None):
                "erode_cells": out.get("erode_cells"),
                "cells_after_trim": out.get("cells_after_trim"),
                "dem": out["dem"]}
+        # The production raster derives its cell from measured density and snaps
+        # its origin, so it never shares a lattice with the archive's, and
+        # compare_to_reference refuses rather than score a half-cell offset.
+        # A second candidate is built on the archive's grid for the comparison;
+        # classification is reused, so it costs the interpolation only.
+        scored = out["dem"]
+        if a.on_grid:
+            grid_dir = os.path.join(tile_dir, "on_archive_grid")
+            os.makedirs(grid_dir, exist_ok=True)
+            # reuse_ground looks beside its own output, so the classified ground
+            # has to be there. A hard link costs nothing and no bytes; without
+            # it the second pass silently reclassifies and the whole point of
+            # reusing -- that classification does not depend on the lattice --
+            # is lost.
+            stem = os.path.splitext(os.path.basename(las))[0]
+            src_g = os.path.join(tile_dir, stem + "_ground.laz")
+            dst_g = os.path.join(grid_dir, stem + "_ground.laz")
+            if os.path.exists(src_g) and not os.path.exists(dst_g):
+                try:
+                    os.link(src_g, dst_g)
+                except OSError:
+                    import shutil
+                    shutil.copy2(src_g, dst_g)
+            og = pipeline.process(las, grid_dir, cfg=cfg, make_g1=False,
+                                  keep_ground=True, reuse_ground=True,
+                                  on_grid=ref, progress=show)
+            scored = og["dem"]
+            rec["dem_on_archive_grid"] = scored
+            rec["cell_m_on_archive_grid"] = round(og["cell_m"], 6)
+        rec["scored"] = scored
         try:
-            sc = calibrate.compare_to_reference(out["dem"], ref)
+            sc = calibrate.compare_to_reference(scored, ref)
             rec.update({k: sc[k] for k in sc})
             rec["ratio"] = sc["complexity_candidate"] / sc["complexity_reference"]
             print("  [compare    ] rmse %.4f m, bias %+.4f m, texture %.2fx"

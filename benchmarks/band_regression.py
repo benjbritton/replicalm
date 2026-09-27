@@ -17,10 +17,12 @@ Two responses, neither referencing a proprietary product:
 
 Both are regressed on the cell's understory band fraction.
 """
-import gzip, json, os, sys
-from dataclasses import replace
+import gzip, json, os, sys, time
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ensure_blas, SRC
 sys.path.insert(0, SRC)
+ensure_blas()
 import pdal
 from replicalm.classify import _ground_stage, las_reader
 from replicalm.config import GroundPass
@@ -41,16 +43,32 @@ RESULTS = os.environ.get(
 os.makedirs(RESULTS, exist_ok=True)
 # The tracked scan is gzipped and already restricted to three-strip cells.
 CELLS = os.path.join(RESULTS, "cells_3strip.json.gz")
-OUT = os.path.join(RESULTS, "band_regression.json")
+OUT = os.path.join(RESULTS, sys.argv[1] if len(sys.argv) > 1
+                   else "band_regression_tuned.json")
 HALF, BUF = 10.0, 70.0
 
+# `pmf` is a stage dict rather than a GroundPass because GroundPass exposes only
+# three of filters.pmf's knobs and leaves `initial_distance` at PDAL's default of
+# 0.15 m. At that value PMF is starved: on the four-rung ladder it recovered no
+# ground at all under closed canopy, and on this population its density response
+# to understory was -0.06 returns per m2 per 10% band -- which is what a filter
+# that classifies almost nothing looks like, not evidence that it resists
+# understory. benchmarks/pmf_tune.py swept 36 combinations on four surfaces;
+# these bring it within 0.1 points per m2 of SMRF.
+#
+# `pmf_tight` is the old setting, kept in the same run so the two are compared on
+# identical cells by identical code rather than across two runs.
 FILTERS = [("smrf", GroundPass(algorithm="smrf", slope=0.05, threshold_m=0.5)),
-           ("pmf",  GroundPass(algorithm="pmf",  slope=0.05, threshold_m=0.5)),
+           ("pmf", {"type": "filters.pmf", "max_window_size": 16.0,
+                    "slope": 0.15, "max_distance": 1.5,
+                    "initial_distance": 0.5, "cell_size": 1.0}),
+           ("pmf_tight", GroundPass(algorithm="pmf", slope=0.05,
+                                    threshold_m=0.5)),
            ("csf",  GroundPass(algorithm="csf",  csf_rigidness=3, csf_threshold_m=0.3))]
 
 def classify(arr, gp):
     """Ground points from one filter, run on the array as given."""
-    stage = _ground_stage(gp)
+    stage = dict(gp) if isinstance(gp, dict) else _ground_stage(gp)
     pl = pdal.Pipeline(json.dumps({"pipeline": [stage]}), arrays=[arr])
     pl.execute()
     out = pl.arrays[0]

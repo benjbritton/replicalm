@@ -20,8 +20,9 @@ absolute level is affected, and no absolute claim is made here.
 import gzip, json, os, sys
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from paths import SRC
+from paths import ensure_blas, SRC
 sys.path.insert(0, SRC)
+ensure_blas()
 import pdal
 from replicalm.classify import las_reader
 
@@ -37,9 +38,16 @@ RESULTS = os.environ.get(
                  "results", "nr_block"))
 HALF = 10.0
 
-R = json.load(open(os.path.join(RESULTS, "band_regression.json")))
-ok = [r for r in R if all("mean_z" in r["filters"].get(f, {})
-                          for f in ("smrf", "pmf", "csf"))]
+IN = os.path.join(RESULTS, sys.argv[1] if len(sys.argv) > 1
+                  else "band_regression_tuned.json")
+OUT = IN.replace("band_regression", "band_offset")
+R = json.load(open(IN, encoding="utf-8"))
+# whichever filters this run carried, so the tuned and tight PMF can be
+# regressed side by side on the same cells
+FILT = [f for f in ("smrf", "pmf", "pmf_tight", "csf")
+        if any("mean_z" in r["filters"].get(f, {}) for r in R)]
+ok = [r for r in R if all("mean_z" in r["filters"].get(f, {}) for f in FILT)]
+print("reading %s; filters %s" % (IN, ", ".join(FILT)))
 by_tile = {}
 for r in ok:
     by_tile.setdefault(r["tile"], []).append(r)
@@ -61,25 +69,27 @@ for n, (tile, cells) in enumerate(sorted(by_tile.items()), 1):
                "p1": float(np.percentile(zc, 1)),
                "p5": float(np.percentile(zc, 5)),
                "returns": int(m.sum())}
-        for f in ("smrf", "pmf", "csf"):
+        for f in FILT:
             rec["off_" + f] = float(c["filters"][f]["median_z"]) - rec["p1"]
             rec["den_" + f] = float(c["filters"][f]["density"])
         rows.append(rec)
     print("  tile %2d/%d  %d cells" % (n, len(by_tile), len(rows)), flush=True)
 
-json.dump(rows, open(os.path.join(RESULTS, "band_offset.json"), "w"), indent=1)
+json.dump(rows, open(OUT, "w", encoding="utf-8"), indent=1)
 
 b = np.array([r["band"] for r in rows])
 print("\nsurface height above the 1st percentile of all returns, vs understory")
 print("  filter  mean offset   corr with band   slope per 10% band   n")
 fits = {}
-for f in ("smrf", "csf", "pmf"):
+for f in FILT:
     o = np.array([r["off_" + f] for r in rows])
     s = np.polyfit(b, o, 1)
     fits[f] = (0.1 * s[0], float(np.corrcoef(b, o)[0, 1]))
-    print("  %-6s %+8.3f m %13.2f %18.3f m %6d"
+    print("  %-9s %+8.3f m %13.2f %18.3f m %6d"
           % (f, o.mean(), fits[f][1], fits[f][0], len(o)))
 print("\ncontrast in slope (common-mode datum bias cancels):")
-for a_, b_ in (("smrf", "pmf"), ("csf", "pmf"), ("smrf", "csf")):
-    print("  %-4s minus %-4s  %+.3f m per 10%% band" % (a_, b_, fits[a_][0] - fits[b_][0]))
-print("\nwrote %s" % os.path.join(RESULTS, "band_offset.json"))
+for i, a_ in enumerate(FILT):
+    for b_ in FILT[i + 1:]:
+        print("  %-9s minus %-9s  %+.3f m per 10%% band"
+              % (a_, b_, fits[a_][0] - fits[b_][0]))
+print("\nwrote %s" % OUT)

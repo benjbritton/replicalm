@@ -56,3 +56,6 @@ packaging/*.log
 /*_ground.las
 /rvt/
 
+
+# ArcGIS leaves these beside a shapefile while it has the layer open
+*.sr.lock

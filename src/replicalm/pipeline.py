@@ -47,11 +47,32 @@ def _noop(stage, message, fraction=None):
 
 def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
             rvt_script=None, progress=None, keep_ground=True,
-            derive_cell=True):
+            derive_cell=True, grid=None, on_grid=None,
+            reuse_ground=False):
     """Process one tile. Returns a dict describing everything written.
 
     `progress(stage, message, fraction)` is called as work proceeds, so a GUI
     can show what is happening without this module knowing what a GUI is.
+
+    `grid` overrides the lattice entirely; `on_grid` is a reference raster whose
+    lattice is adopted, which is the usual way to ask for one. Either makes the
+    output directly comparable to that raster, cell for cell.
+
+    This matters because production derives its cell from measured density and
+    snaps cell edges to whole multiples, so neighbouring tiles mosaic without
+    resampling. Reference DEMs from the original workflow have neither property
+    -- kriging to a data-derived extent in Surfer produced cells of 0.500042 m
+    on origins that are multiples of nothing -- so a production raster and an
+    archive raster never share a lattice, and `calibrate.compare_to_reference`
+    refuses the comparison rather than score a half-cell offset. Building a
+    second candidate on the archive's grid is the answer; resampling the first
+    one afterwards is not, because that measures the resampler.
+
+    `reuse_ground` takes the classified ground beside the output if it is
+    already there, which is what makes building that second candidate cheap:
+    classification is the expensive half and does not depend on the lattice.
+    It reuses whatever is on disk without checking it came from this config, so
+    it is for a second grid over the same run, not for resuming a changed one.
     """
     from . import classify, finalise, grid as G, interpolate, kriging as K
     from .config import PRESETS, verify_baseline
@@ -76,9 +97,12 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
         progress("config", "NOT the locked baseline: %s" % str(e).splitlines()[-1].strip())
     cfg.to_json(os.path.join(out_dir, stem + "_config.json"))
 
-    progress("classify", "classifying ground returns", 0.05)
     ground_las = os.path.join(out_dir, stem + "_ground.laz")
-    classify.classify_tile(las_path, ground_las, cfg, verbose=False)
+    if reuse_ground and os.path.exists(ground_las):
+        progress("classify", "reusing the ground beside the output", 0.05)
+    else:
+        progress("classify", "classifying ground returns", 0.05)
+        classify.classify_tile(las_path, ground_las, cfg, verbose=False)
 
     arr, _ = classify.read_points(ground_las)
     gnd = arr[arr["Classification"] == 2]
@@ -116,14 +140,24 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     # that way against about 4.2 where the returns are, and a cell derived from
     # the first figure comes out nearly twice too coarse.
     density, covered = G.covered_density(x, y)
-    if cell_m is None:
-        cell_m = G.cell_for_density(density,
-                                    factor=getattr(cfg, 'cell_factor', 1.0))
+    if on_grid is not None and grid is None:
+        grid = G.grid_from_raster(on_grid)
+    if grid is not None:
+        g = grid
+        cell_m = g.cell
         progress("interpolate",
-                 "cell size %.2f m derived from %.2f returns per m2 over "
-                 "%.2f km2 of covered ground"
-                 % (cell_m, density, covered / 1e6))
-    g = G.grid_for_las(las_path, cell=cell_m)
+                 "cell size %.4f m and origin adopted from a reference "
+                 "lattice, so the result is comparable to it cell for cell"
+                 % cell_m)
+    else:
+        if cell_m is None:
+            cell_m = G.cell_for_density(density,
+                                        factor=getattr(cfg, 'cell_factor', 1.0))
+            progress("interpolate",
+                     "cell size %.2f m derived from %.2f returns per m2 over "
+                     "%.2f km2 of covered ground"
+                     % (cell_m, density, covered / 1e6))
+        g = G.grid_for_las(las_path, cell=cell_m)
     radius = (cfg.search_radius_m if cfg.search_radius_mode == "fixed"
               and cfg.search_radius_m else
               K.radius_for_density(density, cfg.max_points,

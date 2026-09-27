@@ -1,0 +1,7 @@
+name,role,easting,northing,note
+bare,control,317124.75,1970163.18,"dirt road; every return ground to 3 m, nothing above 0.15 m, slope 1.0%"
+clutter_dense,clutter,317130.6,1970149.5,"21.4% of returns in 0.15-0.35 m, canopy p90 0.32 m, 15 m from the bare rung"
+clutter_sparse,clutter,316698.41,1970492.9,3.7% in 0.20-0.35 m; the sparse case observation 6 actually describes
+riser_open,real relief,316810.0,1970329.6,"16.3% open slope, 11.3 ground returns per m2, no canopy. The clean false-positive test: nothing is standing here, so anything the threshold removes is a mistake"
+mound_flank,architecture,316622.34,1970507.42,"southeast flank of a mound, identified by Ben. Crest 10 m west at 79.2 m falling 15.7 m to a flat 30 m east; slope 86% within 3 m, 74% within 10 m. Under 85% canopy at 5.0 ground returns per m2, so removals here are ambiguous between vegetation and terrain -- it shows behaviour on real architecture, it does not measure the false-positive rate"
+forest,canopy,316450.8,1970610.0,"Ka'Kabish platform complex, 18.7 m canopy, 77% of returns above 2 m"

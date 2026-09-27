@@ -360,34 +360,51 @@ not determinable from the g1 sources, and should not be guessed at.
 
 ## 12. Which filter is deceived by understory, measured without ground truth
 
-**Status:** open, and the Optimization work rests on it. **Revised 2026-09-26:
-the PMF row of the table below is not safe** -- see "The 0.53 m gap was our
-parameters" at the end of this observation. The SMRF and CSF rows stand.
+**Status:** open, and the Optimization work rests on it. **Rewritten 2026-09-26
+after PMF's apparent immunity to understory turned out to be a parameter
+artifact.** The earlier reading -- that PMF alone resists understory -- does not
+survive; all three filters follow it at indistinguishable rates.
 
 Across 41 flat cells in the New River block (slope under 2%, three overlapping
 strips, band fraction 3.1 to 13.2%), each filter's surface was measured against
 the 1st percentile of all returns in its own cell -- a datum referencing no
 classification and no commercial product:
 
-| filter | surface rise per 10% band | r | t |
-|---|---|---|---|
-| CSF | +0.553 m | +0.49 | +3.55 |
-| SMRF | +0.456 m | +0.42 | +2.91 |
-| PMF | -0.034 m | -0.03 | -0.21 |
+| filter | surface rise per 10% band | r | t | density per 10% band |
+|---|---|---|---|---|
+| CSF | +0.553 m | +0.49 | +3.55 | +7.73 |
+| PMF | +0.482 m | +0.44 | +3.02 | +7.30 |
+| SMRF | +0.456 m | +0.42 | +2.91 | +7.23 |
+| PMF, starved | -0.034 m | -0.03 | -0.21 | -0.06 |
 
-Over ground with no reason to be higher where the scrub is thicker, SMRF and CSF
-rise with understory and PMF does not. Recovered ground density says the same
-independently: SMRF +7.23 and CSF +7.73 returns per m2 per 10% band, PMF -0.06.
-So SMRF and CSF are following the understory, and the ambiguity in the
-filter-to-filter comparison -- which could equally have been PMF eroding terrain
--- resolves in that direction.
+Over ground with no reason to be higher where the scrub is thicker, **every
+filter's surface rises with understory**, and recovered density rises with it
+too, by about 7.3 returns per m2 per 10% band in all three cases. They are
+accepting vegetation as ground, and they are doing it at the same rate. The
+filter-to-filter comparison therefore distinguishes nothing: the choice of
+morphological filter is not where this error lives.
 
-That also reconciles two datasets that appeared to disagree. On G-LiHT, scored
-against the archive, PMF looked worst: biased low on every tile at 0.34 to 0.75x
-its texture. But the archive shares the understory acceptance now measured in
-SMRF and CSF, so part of PMF's negative bias is it correctly declining vegetation
-the archive kept. Not all of it -- 0.34x is too much smoothing to explain that
-way -- so PMF plausibly over-erodes relief *and* rejects understory properly.
+The last row is the same PMF at the settings used until 2026-09-26, run on the
+same cells by the same code in the same pass. `GroundPass` exposes three of
+`filters.pmf`'s knobs and leaves `initial_distance` at PDAL's default of 0.15 m;
+at that value PMF recovered 5.25 points per m2 against SMRF's 10.35, and on the
+four-rung ladder it recovered no ground at all under closed canopy. A filter
+that classifies almost nothing as ground cannot be shown to resist understory --
+it has nothing to rise with. Raising `initial_distance` to 0.5 and
+`max_distance` to 1.5 brings it to 10.35 points per m2, exactly SMRF's, and the
+slope goes from -0.034 to +0.482 m.
+
+The rerun reproduces the SMRF, CSF and starved-PMF figures to three decimals, so
+it is a like-for-like replacement rather than a different measurement.
+
+**A consequence that has not been checked.** The earlier text used PMF's apparent
+restraint to reconcile a disagreement between datasets: on G-LiHT, scored against
+the archive, PMF is biased low on every tile at 0.34 to 0.75x its texture, and
+that was read as PMF correctly declining vegetation the archive kept. That
+reading is now unavailable -- tuned PMF accepts understory like the others. The
+G-LiHT PMF comparison ran through the same `GroundPass` interface with the same
+default, so the low bias there is plausibly the same starvation and not a
+property of the algorithm. It should be re-run before being quoted.
 
 **The surfaces this is built on.** Test surface at 316450.8 E, 1970610.0 N (UTM
 16N), 148 m from the Ka'Kabish centre: 0.21% slope, 18.7 m canopy, 77% of returns
@@ -405,9 +422,11 @@ cleanup's threshold rather than the phenomenon. The lower bound should be derive
 from the bare control -- the distribution of return heights above a fitted plane
 where nothing is standing -- rather than asserted.
 
-**What is still open.** How far above the soil any filter sits; whether PMF is
-right or merely anchored to the minimum surface, holding a near-constant 0.20 m
-above the lowest returns. Those need surveyed control.
+**What is still open.** How far above the soil any filter sits. That question is
+now sharper, not vaguer: three independent algorithms agree with each other to
+within the survey's own noise and all three rise with understory together, so
+their agreement carries no information about whether any of them is right. Only
+an external datum can settle it.
 
 
 ### The 0.53 m gap was our parameters, not a property of PMF
@@ -482,7 +501,10 @@ the project's strongest precision result into an accuracy result, and it is
 named here as future work rather than claimed.
 
 Method and results: `benchmarks/band_profile.py`, `benchmarks/ladder.py`,
-`benchmarks/pmf_tune.py`, with `benchmarks/results/nr_block/band_profile.json`,
-`ladder.json` and `pmf_tune.json`.
+`benchmarks/pmf_tune.py`, `benchmarks/band_regression.py` and
+`benchmarks/band_offset.py`, with `band_profile.json`, `ladder.json`,
+`pmf_tune.json`, `band_regression_tuned.json` and `band_offset_tuned.json` under
+`benchmarks/results/nr_block/`. The pre-2026-09-26 regression is kept as
+`band_regression.json` and `band_offset.json` for comparison.
 
 Point clouds by Alec McLellan; published with his permission.
