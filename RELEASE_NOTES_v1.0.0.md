@@ -3,10 +3,10 @@ tools. Replicalm turns a raw airborne lidar point cloud into a bare-earth
 digital elevation model and the G1 relief visualization, following the NCALM
 workflow described in the Estrada-Belli et al. 2025 supplementary material.
 
-The published method depends on two commercial products — TerraScan for ground
-classification and Golden Surfer for interpolation and rasterization. Replicalm
-replaces both with PDAL, GDAL, NumPy and SciPy, plus the Relief Visualization
-Toolbox for the optional image step.
+The published method had depended on two commercial products — TerraScan for
+ground classification and Golden Surfer for interpolation and rasterization.
+Replicalm replaces both with PDAL, GDAL, NumPy and SciPy, plus the Relief
+Visualization Toolbox for the optional image step.
 
 ## What is in this release
 

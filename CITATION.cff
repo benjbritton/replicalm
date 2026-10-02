@@ -7,13 +7,14 @@ abstract: >-
   digital elevation model and the G1 relief visualization, following the NCALM
   workflow described in the Estrada-Belli et al. 2025 supplementary material
   using only PDAL, GDAL, NumPy and SciPy, with the Relief Visualization Toolbox
-  for the optional image step. The published method depends on TerraScan for
-  ground classification and Golden Surfer for interpolation and rasterization;
-  Replicalm replaces both.
+  for the optional image step. The published method had depended on TerraScan
+  for ground classification and Golden Surfer for interpolation and
+  rasterization; Replicalm replaces both.
 type: software
 authors:
   - family-names: Britton
-    given-names: Benjamin J.
+    given-names: Benjamin
+    orcid: "https://orcid.org/0009-0006-7475-3795"
     affiliation: >-
       Department of Geography, College of Arts & Sciences,
       University of Cincinnati

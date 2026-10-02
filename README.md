@@ -339,5 +339,5 @@ Cite the archived release rather than the repository, so the version is
 unambiguous. `CITATION.cff` in this repository carries the machine-readable
 form; GitHub renders it under "Cite this repository".
 
-Britton, Benjamin J. (2026). *Replicalm* (v1.0.0) [Software]. University of
+Britton, Benjamin (2026). *Replicalm* (v1.0.0) [Software]. University of
 Cincinnati. DOI: 10.5281/zenodo.23110738
