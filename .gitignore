@@ -59,3 +59,16 @@ packaging/*.log
 
 # ArcGIS leaves these beside a shapefile while it has the layer open
 *.sr.lock
+
+# Superseded drafts and the unfinished paper: kept locally, not published.
+# Only the latest overview and report are tracked.
+Replicalm_overview_v[1-5].docx
+Replicalm_report.docx
+Replicalm_report_v[2-3].docx
+docs/paper/
+
+# A development handoff note and two post drafts whose finished versions are
+# published as markdown under docs/posts/. Kept locally.
+HANDOFF.md
+Replicalm_post_calibrating_v1.docx
+Replicalm_post_specks_v1.docx
