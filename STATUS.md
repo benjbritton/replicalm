@@ -63,7 +63,14 @@ shorter useful life. Cite the source unless the installer itself is the subject.
 
 ## Still outstanding
 
-- **Scholar@UC deposit** of the installer, as `brittobj`. Not started.
+- **Scholar@UC: abandoned, deliberately.** The repository caps files at 1 GB and
+  the installer is 1.21 GB, so it cannot be deposited there. Its licence list is
+  also Creative Commons only, which does not fit MIT-licensed software -- CC has
+  no patent grant and no warranty disclaimer, and selecting one would have
+  offered the same code under two different sets of terms. The installer is
+  archived at Zenodo with its own DOI and downloadable from the GitHub release,
+  so preservation does not depend on it. A metadata-only record pointing at the
+  DOI remains possible if institutional visibility is wanted later.
 - **Work not yet published.** The slope-aware cleanup built on 2026-10-02 is
   stashed, not committed: `git stash list` shows it as "today's slope-aware
   cleanup work, held during the email rewrite". It replaces the cleanup's
