@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: Replicalm
+abstract: >-
+  Bare-earth lidar processing that reproduces a commercial workflow with open
+  tools. Replicalm turns a raw airborne lidar point cloud into a bare-earth
+  digital elevation model and the G1 relief visualization, following the NCALM
+  workflow described in the Estrada-Belli et al. 2025 supplementary material
+  using only PDAL, GDAL, NumPy and SciPy, with the Relief Visualization Toolbox
+  for the optional image step. The published method depends on TerraScan for
+  ground classification and Golden Surfer for interpolation and rasterization;
+  Replicalm replaces both.
+type: software
+authors:
+  - family-names: Britton
+    given-names: Benjamin J.
+    affiliation: >-
+      Department of Geography, College of Arts & Sciences,
+      University of Cincinnati
+license: MIT
+version: 1.0.0
+date-released: "2026-09-24"
+repository-code: "https://github.com/benjbritton/replicalm"
+keywords:
+  - lidar
+  - bare-earth DEM
+  - ground classification
+  - kriging
+  - relief visualization
+  - archaeology
+  - reproducibility
+  - PDAL
+  - GDAL

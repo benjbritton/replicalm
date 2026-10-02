@@ -2,6 +2,12 @@
 
 **Bare-earth lidar processing that reproduces a commercial workflow with open tools.**
 
+<!-- ZENODO-DOI-BADGE: replace the line below once the Zenodo record
+     for benjbritton/replicalm has been minted. The badge markdown is
+     offered on the Zenodo record page under "Cite all versions". -->
+[![DOI](https://zenodo.org/badge/DOI/PENDING.svg)](https://doi.org/PENDING)
+
+
 Replicalm turns a raw airborne lidar point cloud into two products: a bare-earth
 digital elevation model, and the G1 relief visualization archaeologists actually
 read. It follows the NCALM workflow described in the Estrada-Belli et al. 2025
@@ -329,3 +335,12 @@ MIT — see [LICENSE](LICENSE).
 ---
 
 Benjamin Jay Britton, 2026
+
+## Citation
+
+Cite the archived release rather than the repository, so the version is
+unambiguous. `CITATION.cff` in this repository carries the machine-readable
+form; GitHub renders it under "Cite this repository".
+
+Britton, Benjamin J. (2026). *Replicalm* (v1.0.0) [Software]. University of
+Cincinnati. DOI: PENDING
