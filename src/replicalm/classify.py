@@ -113,6 +113,28 @@ def read_points(path, srs=None):
     return pl.arrays[0], pl.metadata
 
 
+def write_points(arr, out_path, cfg, srs=None):
+    """Write a structured array of returns to LAZ, as classify_tile would.
+
+    Used to save the ground AFTER Clear's cleanup has run, which classify_tile
+    cannot do because the cleanup happens later, in the pipeline, on the array
+    this writes.
+    """
+    import json
+    pdal = _pdal()
+    writer = {"type": "writers.las", "filename": str(out_path),
+              "minor_version": int(str(cfg.las_version).split(".")[1]),
+              "dataformat_id": int(getattr(cfg, "las_point_format", 6)),
+              "compression": ("laszip" if getattr(cfg, "las_compression", True)
+                              else "false"),
+              "software_id": "Replicalm"}
+    if srs:
+        writer["a_srs"] = str(srs)
+    pl = pdal.Pipeline(json.dumps({"pipeline": [writer]}), arrays=[arr])
+    pl.execute()
+    return str(out_path)
+
+
 def classify_tile(in_path, out_path, cfg, verbose=True, srs=None):
     """Run steps 3 to 7 on one tile. Returns a dict of counts for the log.
 

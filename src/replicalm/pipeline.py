@@ -48,7 +48,7 @@ def _noop(stage, message, fraction=None):
 def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
             rvt_script=None, progress=None, keep_ground=True,
             derive_cell=True, grid=None, on_grid=None,
-            reuse_ground=False):
+            reuse_ground=False, ground_stage="after"):
     """Process one tile. Returns a dict describing everything written.
 
     `progress(stage, message, fraction)` is called as work proceeds, so a GUI
@@ -73,6 +73,22 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     classification is the expensive half and does not depend on the lattice.
     It reuses whatever is on disk without checking it came from this config, so
     it is for a second grid over the same run, not for resuming a changed one.
+
+    `keep_ground` saves the ground returns as LAZ. `ground_stage` chooses when:
+
+      "after"   (default) the ground Clear kept, written to
+                `<stem>_ground_cleaned.laz`. This is the surface the DEM was
+                actually built from.
+      "before"  the ground as the filter classified it, residual low vegetation
+                included, written to `<stem>_ground.laz`. Re-deriving the
+                cleanup at another threshold starts here and skips
+                classification, which is the expensive half.
+
+    The two go to different filenames deliberately. `reuse_ground` looks for
+    `<stem>_ground.laz`, so a cleaned file saved under that name would be
+    cleaned a second time on the next run, quietly removing more ground each
+    pass. Keeping the names apart makes that impossible rather than merely
+    unlikely.
     """
     from . import classify, finalise, grid as G, interpolate, kriging as K
     from .config import PRESETS, verify_baseline
@@ -106,6 +122,7 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
 
     arr, _ = classify.read_points(ground_las)
     gnd = arr[arr["Classification"] == 2]
+    cleaned = False
 
     # Residual low vegetation the ground filter accepted. Removing it is the
     # delivered method; set clean_vegetation False for the unfiltered surface,
@@ -113,16 +130,28 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     # comparison figures are measured against.
     if getattr(cfg, "clean_vegetation", False) and len(gnd):
         from . import cleanup
-        above = cleanup.height_above_floor(
-            gnd["X"].astype("f8"), gnd["Y"].astype("f8"),
-            gnd["Z"].astype("f8"),
-            patch=getattr(cfg, "clean_patch_m", 0.75),
-            percentile=getattr(cfg, "clean_percentile", 10.0))
+        gx = gnd["X"].astype("f8"); gy = gnd["Y"].astype("f8")
+        gz = gnd["Z"].astype("f8")
+        if getattr(cfg, "clean_slope_aware", False):
+            fit_r = (getattr(cfg, "clean_plane_patch_m", None)
+                     or getattr(cfg, "clean_patch_m", 0.75))
+            progress("classify", "cleanup measured against a plane fitted over "
+                                 "%.2f m, so the rule does not fire on slope"
+                     % fit_r)
+            above = cleanup.height_above_plane(
+                gx, gy, gz, patch=getattr(cfg, "clean_patch_m", 0.75),
+                plane_patch=fit_r)
+        else:
+            above = cleanup.height_above_floor(
+                gx, gy, gz,
+                patch=getattr(cfg, "clean_patch_m", 0.75),
+                percentile=getattr(cfg, "clean_percentile", 10.0))
         keep = above <= getattr(cfg, "clean_height_m", 0.20)
         progress("classify", "removed %d of %d ground returns (%.1f%%) standing "
                              "above the ground around them"
                  % ((~keep).sum(), len(keep), 100 * (~keep).mean()))
         gnd = gnd[keep]
+        cleaned = True
 
     if len(gnd) < cfg.min_ground_points:
         raise PipelineError(
@@ -183,12 +212,38 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
 
     progress("finalise", "filling holes, trimming the coverage edge", 0.75)
     wkt = interpolate.source_srs(las_path)
+
+    # Save the ground, if asked, at the stage asked for. "after" is the surface
+    # the DEM was built from; "before" is what the filter produced and is the
+    # one to keep if the cleanup threshold may be revisited.
+    kept_ground = None
+    if keep_ground:
+        if ground_stage == "before":
+            kept_ground = ground_las
+        else:
+            cleaned_las = os.path.join(out_dir, stem + "_ground_cleaned.laz")
+            try:
+                classify.write_points(gnd, cleaned_las, cfg, srs=wkt)
+                kept_ground = cleaned_las
+                progress("classify", "ground after cleanup written: %s"
+                         % os.path.basename(cleaned_las))
+            except Exception as exc:
+                progress("classify", "could not write the cleaned ground (%s); "
+                         "keeping the classified ground instead"
+                         % str(exc)[:60])
+                kept_ground = ground_las
+            if kept_ground != ground_las and not cleaned:
+                # nothing was removed, so the two files would be identical
+                progress("classify", "cleanup did not run for this profile; "
+                         "the saved ground is the classified ground")
+
     dem_path = os.path.join(out_dir, stem + "_DEM.tif")
     report = finalise.finalise(dem, g, wkt, dem_path, radius_m=radius,
                                nodata_in=-9999.0,
                                erode_factor=cfg.erode_factor, verbose=False)
 
-    out = {"dem": dem_path, "ground_las": ground_las if keep_ground else None,
+    out = {"dem": dem_path, "ground_las": kept_ground,
+           "ground_stage": ground_stage if kept_ground else None,
            "ground_points": int(len(z)), "density": density,
            "search_radius_m": radius, "cell_m": cell_m,
            "fallback_fraction": info["fallback_fraction"],
@@ -205,7 +260,7 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     out.update({k: report[k] for k in
                 ("filled_cells", "holes", "erode_cells", "erode_m",
                  "cells_after_trim", "filled_fraction")})
-    if not keep_ground and os.path.exists(ground_las):
+    if kept_ground != ground_las and os.path.exists(ground_las):
         os.remove(ground_las)
 
     if make_g1:
@@ -280,6 +335,18 @@ def main(argv=None):
     p.add_argument("--cell", type=float, default=None,
                    help="output cell size in metres (default 1.0)")
     p.add_argument("--g1", action="store_true", help="also build the G1 image")
+    p.add_argument("--keep-ground", action="store_true",
+                   help="save the ground returns as LAZ beside the DEM")
+    p.add_argument("--slope-aware-cleanup", action="store_true",
+                   help="measure the cleanup height against a plane fitted to "
+                        "each neighbourhood instead of the 10th percentile of "
+                        "its raw elevations, so the rule stops removing ground "
+                        "for being on a slope")
+    p.add_argument("--ground-stage", choices=("after", "before"),
+                   default="after",
+                   help="which ground to save: 'after' the cleanup, the surface "
+                        "the DEM was built from (default), or 'before' it, "
+                        "which is where re-deriving the cleanup starts")
     p.add_argument("--rvt-script", default=None,
                    help="path to GLiHT_rvt.py for the image step")
     p.add_argument("--profile", "--preset", dest="preset",
@@ -344,9 +411,15 @@ def main(argv=None):
     def show(stage, message, fraction=None):
         print("[%-11s] %s" % (stage, message))
 
+    if a.slope_aware_cleanup:
+        cfg = replace(cfg, clean_slope_aware=True)
     out = process(a.las, a.out, cfg=cfg, cell_m=a.cell,
-                  make_g1=a.g1, rvt_script=a.rvt_script, progress=show)
+                  make_g1=a.g1, rvt_script=a.rvt_script, progress=show,
+                  keep_ground=a.keep_ground, ground_stage=a.ground_stage)
     print("\nDEM: %s" % out["dem"])
+    if out.get("ground_las"):
+        print("Ground (%s cleanup): %s" % (out["ground_stage"],
+                                           out["ground_las"]))
     print("%d ground points, %.2f per m2, radius %.2f m, %d cells kept"
           % (out["ground_points"], out["density"], out["search_radius_m"],
              out["cells_after_trim"]))

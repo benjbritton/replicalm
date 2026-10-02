@@ -66,6 +66,10 @@ class App(tk.Tk):
         self.reason = tk.StringVar()
         self.g1 = tk.BooleanVar(value=False)
         self.keep = tk.BooleanVar(value=False)
+        # Which ground to save. "after" is the surface the DEM was built from;
+        # "before" is the filter's own output, which is where re-deriving the
+        # cleanup at another threshold starts without re-classifying.
+        self.ground_stage = tk.StringVar(value="after cleanup")
 
         ttk.Label(frm, text="Point cloud").grid(row=0, column=0, sticky="w")
         ttk.Entry(frm, textvariable=self.las, width=62).grid(row=0, column=1,
@@ -108,8 +112,12 @@ class App(tk.Tk):
                                                           padx=(0, 0))
         ttk.Entry(opts, textvariable=self.threshold, width=7).pack(
             side="left", padx=(6, 18))
-        ttk.Checkbutton(opts, text="Keep classified points",
+        ttk.Checkbutton(opts, text="Keep ground points",
                         variable=self.keep).pack(side="left")
+        ttk.Combobox(opts, textvariable=self.ground_stage, width=18,
+                     state="readonly",
+                     values=("after cleanup", "before cleanup")).pack(
+                         side="left", padx=(6, 0))
         frm.columnconfigure(1, weight=1)
 
         # The search neighbourhood. Left alone on most surveys: past the
@@ -289,13 +297,17 @@ class App(tk.Tk):
             target=self._work, args=(las, out, cell, self.g1.get(),
                                      self.keep.get(), self.profile.get(),
                                      threshold, maxpts, minpts,
-                                     self.reason.get().strip()),
+                                     self.reason.get().strip(),
+                                     self.ground_stage.get()),
             daemon=True)
         self.worker.start()
 
     def _work(self, las, out, cell, make_g1, keep, profile, threshold,
-              maxpts, minpts, reason):
+              maxpts, minpts, reason, ground_stage_label="after cleanup"):
         q = self.messages
+        # the control reads in words; the pipeline takes a keyword
+        ground_stage = ("before" if str(ground_stage_label).startswith("before")
+                        else "after")
 
         def progress(stage, message, fraction=None):
             q.put(("log", "[%-11s] %s" % (stage, message)))
@@ -331,9 +343,14 @@ class App(tk.Tk):
                              else "%.2f (method default)" % cfg.passes[0].threshold_m)))
             result = pipeline.process(las, out, cfg=cfg,
                                       cell_m=cell, make_g1=make_g1,
-                                      keep_ground=keep, progress=progress)
+                                      keep_ground=keep,
+                                      ground_stage=ground_stage,
+                                      progress=progress)
             q.put(("log", ""))
             q.put(("log", "DEM written: %s" % result["dem"]))
+            if result.get("ground_las"):
+                q.put(("log", "Ground (%s cleanup): %s"
+                              % (result["ground_stage"], result["ground_las"])))
             q.put(("log", "%d ground points, %.2f per m2, cell %.2f m, "
                           "radius %.2f m"
                           % (result["ground_points"], result["density"],

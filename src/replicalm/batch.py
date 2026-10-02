@@ -68,7 +68,7 @@ def _tile_key(path):
 def _one(job):
     """Process a single tile in a worker. Returns a record, never raises."""
     (path, out_dir, preset, cell_m, make_g1, keep_ground, rvt_script,
-     threads) = job
+     threads, ground_stage) = job
     # Set before the first numpy import in this process, which is why it is here
     # and not at module level: LAPACK and the neighbour query read these once.
     # Left at one, N workers on a big machine use N cores of it -- see the note
@@ -93,6 +93,7 @@ def _one(job):
         cfg = PRESETS[preset]
         out = pipeline.process(path, out_dir, cfg=cfg, cell_m=cell_m,
                                make_g1=make_g1, keep_ground=keep_ground,
+                               ground_stage=ground_stage,
                                rvt_script=rvt_script, progress=None)
         peak = None
         if _proc is not None:
@@ -177,7 +178,7 @@ def _budget_bytes(explicit_gb=None):
 
 def run(las_paths, out_dir, preset="clear", workers=None, cell_m=None,
         make_g1=False, keep_ground=False, rvt_script=None, redo=False,
-        manifest=None, verbose=True, memory_gb=None):
+        manifest=None, verbose=True, memory_gb=None, ground_stage="after"):
     """Process every tile in `las_paths`. Returns the manifest dict."""
     os.makedirs(out_dir, exist_ok=True)
     manifest = manifest or os.path.join(out_dir, "batch_manifest.json")
@@ -233,7 +234,8 @@ def run(las_paths, out_dir, preset="clear", workers=None, cell_m=None,
                 pending.pop(0)
                 committed += charge[nxt]
                 fut = pool.submit(_one, (nxt, out_dir, preset, cell_m, make_g1,
-                                         keep_ground, rvt_script, threads))
+                                         keep_ground, rvt_script, threads,
+                                         ground_stage))
                 running[fut] = nxt
             finished, _ = cf.wait(running, return_when=cf.FIRST_COMPLETED)
             for fut in finished:
@@ -299,7 +301,12 @@ def main(argv=None):
                    help="output cell size in metres (default: from density)")
     p.add_argument("--g1", action="store_true", help="also build the G1 image")
     p.add_argument("--keep-ground", action="store_true",
-                   help="keep the classified point cloud for each tile")
+                   help="save the ground returns as LAZ for each tile")
+    p.add_argument("--ground-stage", choices=("after", "before"),
+                   default="after",
+                   help="which ground to save: 'after' the cleanup, the surface "
+                        "the DEM was built from (default), or 'before' it, "
+                        "which is where re-deriving the cleanup starts")
     p.add_argument("--rvt-script", default=None)
     p.add_argument("--memory-gb", type=float, default=None,
                    help="memory the run may commit at once "
@@ -325,6 +332,7 @@ def main(argv=None):
 
     run(paths, a.out, preset=a.preset, workers=a.workers, cell_m=a.cell,
         make_g1=a.g1, keep_ground=a.keep_ground, rvt_script=a.rvt_script,
+        ground_stage=a.ground_stage,
         redo=a.redo, memory_gb=a.memory_gb)
     return 0
 

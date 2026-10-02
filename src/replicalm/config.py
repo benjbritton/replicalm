@@ -241,6 +241,20 @@ class ReplicalmConfig:
     clean_vegetation: bool = True
     clean_patch_m: float = 0.75
     clean_height_m: float = 0.20
+    # Measure the height against a plane fitted to the neighbourhood instead of
+    # against the 10th percentile of its raw elevations. The percentile sits
+    # downhill on a slope, so the published rule removes ground for being on an
+    # incline: measured on l0s395 it moves the surface not at all below 9.5
+    # degrees and by 12 cm beyond 40, with 99% of the movement downward. The
+    # plane cancels the terrain and leaves what stands above it. Off by default
+    # -- it is a departure from the source method, not a translation of it.
+    clean_slope_aware: bool = False
+    # Radius the plane is fitted over, when `clean_slope_aware` is set. Separate
+    # from `clean_patch_m` because the two do different jobs: the threshold wants
+    # a small neighbourhood, while the plane must sit on the ground and will be
+    # tilted onto itself by a clump of scrub wider than the disc it is fitted
+    # over. None means use `clean_patch_m`.
+    clean_plane_patch_m: float = None
     clean_percentile: float = 10.0
 
     # export, step 7
