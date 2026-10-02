@@ -21,6 +21,11 @@ license: MIT
 version: 1.0.0
 date-released: "2026-09-24"
 repository-code: "https://github.com/benjbritton/replicalm"
+doi: "10.5281/zenodo.23110738"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.23110738"
+    description: "Concept DOI, resolves to the latest version"
 keywords:
   - lidar
   - bare-earth DEM
