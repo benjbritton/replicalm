@@ -6,7 +6,8 @@
 |---|---|
 | Repository | https://github.com/benjbritton/replicalm |
 | Release | https://github.com/benjbritton/replicalm/releases/tag/v1.0.0 |
-| DOI | [10.5281/zenodo.23110738](https://doi.org/10.5281/zenodo.23110738) |
+| DOI, source | [10.5281/zenodo.23110738](https://doi.org/10.5281/zenodo.23110738) |
+| DOI, installer | [10.5281/zenodo.23110800](https://doi.org/10.5281/zenodo.23110800) |
 | Branch | `main`, tracking `origin/main` |
 | Tag | `v1.0.0` → `e1f15b2` |
 | Installer asset | `Replicalm-1.0.0-setup.exe`, 1,211,198,530 bytes, uploaded |
@@ -45,16 +46,20 @@ The pre-rewrite history survives locally on the `backup-pre-email-rewrite`
 branch and under `refs/original/`. Neither was pushed, and both still carry the
 personal address, so neither should be.
 
-## What Zenodo holds
+## Two Zenodo records, deliberately
 
-Zenodo archives a zip of the repository source at the tag -- about 39 MB. It
-does **not** hold the 1.21 GB installer, which exists only as a GitHub release
-asset. If the installer should be in the citable record as well, it has to be
-uploaded to the Zenodo record by hand; the default record limit is 50 GB, so
-size is not the obstacle.
+The webhook record holds a zip of the repository source at the tag, about 39 MB.
+A second record was deposited by hand for the 1.21 GB Windows installer, because
+a DOI resolves to a record and the first record does not contain the installer:
+following that DOI gets a reader the source and nothing else.
 
-**Undecided.** Worth settling, because the point of archiving is that the
-artefact outlives the host.
+The two are linked. The installer record declares "is derived from" the source
+record and "is supplement to" the GitHub repository, so neither floats free and
+a reader landing on either can find the other.
+
+A note on what each is worth over time: the source is what stays reproducible,
+while a compiled Windows binary carrying a packed conda environment has a
+shorter useful life. Cite the source unless the installer itself is the subject.
 
 ## Still outstanding
 

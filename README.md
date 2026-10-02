@@ -4,6 +4,12 @@
 
 [![DOI](https://zenodo.org/badge/1402301653.svg)](https://doi.org/10.5281/zenodo.23110738)
 
+Two archived records, deliberately separate. The badge above is the
+**source**, which is what stays reproducible. The **Windows installer** is
+archived on its own at [10.5281/zenodo.23110800](https://doi.org/10.5281/zenodo.23110800), because a compiled
+distribution and the source it was built from are different artefacts and a
+reader may want to cite either.
+
 
 Replicalm turns a raw airborne lidar point cloud into two products: a bare-earth
 digital elevation model, and the G1 relief visualization archaeologists actually
@@ -341,3 +347,6 @@ form; GitHub renders it under "Cite this repository".
 
 Britton, Benjamin (2026). *Replicalm* (v1.0.0) [Software]. University of
 Cincinnati. DOI: 10.5281/zenodo.23110738
+
+To cite the installer specifically rather than the source, use
+DOI: 10.5281/zenodo.23110800.

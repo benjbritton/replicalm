@@ -26,7 +26,10 @@ doi: "10.5281/zenodo.23110738"
 identifiers:
   - type: doi
     value: "10.5281/zenodo.23110738"
-    description: "Concept DOI, resolves to the latest version"
+    description: "Concept DOI for the source, resolves to the latest version"
+  - type: doi
+    value: "10.5281/zenodo.23110800"
+    description: "The Windows installer for version 1.0.0, archived separately"
 keywords:
   - lidar
   - bare-earth DEM
