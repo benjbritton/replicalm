@@ -22,6 +22,17 @@ WHY PROCESSES AND NOT THREADS
 The work is numpy, PDAL and GDAL, and the part that dominates -- the kriging
 solve -- holds the GIL. Threads would serialise on exactly the expensive step.
 
+BUT EACH PROCESS STILL WANTS SEVERAL THREADS
+--------------------------------------------
+Pinning every worker to one thread was right when workers outnumbered cores. It
+is wrong here. Memory, not cores, decides how many tiles run at once -- three,
+on a 128 GB machine -- so on 72 cores that left 69 of them idle. Measured on
+this machine, going from one thread to sixteen takes the neighbour query from
+3.05 s to 0.22 s and the batched solve from 0.48 s to 0.21 s; both saturate by
+sixteen. So each worker is given cores divided by the number of tiles the memory
+budget will actually admit, capped at sixteen because past that it buys
+nothing and only invites contention.
+
 ORDER
 -----
 Largest tiles first. With N workers and unequal tiles, starting the big ones
@@ -37,11 +48,17 @@ import os
 import time
 import traceback
 
-# Peak resident memory per tile, as a multiple of its file size. Measured,
-# not guessed: a 2.0 GB LAS held 11.6 GB while classifying, a ratio of 5.8.
-# Eight is that with margin -- overestimating costs a slower run, and
-# underestimating killed one.
-MEMORY_FACTOR = 8.0
+import numpy as np
+
+# Peak resident memory per tile, as a multiple of its file size. Measured, not
+# guessed: a 2.0 GB LAS held 11.6 GB while classifying, a ratio of 5.8. Eight
+# was that with margin, and it was still too low -- on 2026-09-27 a run at an
+# 88 GB budget admitted about six 2 GB tiles at once and the machine ran out
+# before the first of them finished, while the same run at 64 GB held three
+# tiles at 42-45 GB charged and survived two and a half hours. Ten is what that
+# implies. Overestimating costs a slower run; underestimating has now killed
+# three.
+MEMORY_FACTOR = 10.0
 
 
 def _tile_key(path):
@@ -50,16 +67,26 @@ def _tile_key(path):
 
 def _one(job):
     """Process a single tile in a worker. Returns a record, never raises."""
-    path, out_dir, preset, cell_m, make_g1, keep_ground, rvt_script = job
+    (path, out_dir, preset, cell_m, make_g1, keep_ground, rvt_script,
+     threads) = job
     # Set before the first numpy import in this process, which is why it is here
-    # and not at module level: LAPACK and the neighbour query each thread across
-    # every core by default, so N workers would each claim all of them and spend
-    # their time contending. Parallelism belongs at the tile level here.
+    # and not at module level: LAPACK and the neighbour query read these once.
+    # Left at one, N workers on a big machine use N cores of it -- see the note
+    # at the top of this file.
     for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS",
                 "NUMEXPR_NUM_THREADS", "REPLICALM_QUERY_WORKERS"):
-        os.environ.setdefault(var, "1")
+        os.environ[var] = str(threads)
     t0 = time.time()
     rec = {"tile": _tile_key(path), "las": str(path), "status": "failed"}
+    # Peak resident memory for this worker, recorded rather than assumed.
+    # MEMORY_FACTOR has been wrong twice and each time the run died hours in
+    # with nothing to show why; a tile that records what it actually took lets
+    # the next run be sized from measurement.
+    try:
+        import psutil
+        _proc = psutil.Process()
+    except Exception:
+        _proc = None
     try:
         from .config import PRESETS
         from . import pipeline
@@ -67,7 +94,17 @@ def _one(job):
         out = pipeline.process(path, out_dir, cfg=cfg, cell_m=cell_m,
                                make_g1=make_g1, keep_ground=keep_ground,
                                rvt_script=rvt_script, progress=None)
+        peak = None
+        if _proc is not None:
+            try:
+                mi = _proc.memory_info()
+                peak = getattr(mi, "peak_wset", None) or mi.rss
+            except Exception:
+                peak = None
         rec.update(status="done", seconds=round(time.time() - t0, 1),
+                   peak_gb=(round(peak / (1 << 30), 2) if peak else None),
+                   peak_over_las=(round(peak / max(os.path.getsize(path), 1), 2)
+                                  if peak else None),
                    dem=out["dem"], ground_points=out["ground_points"],
                    density=round(out["density"], 3),
                    cell_m=round(out["cell_m"], 4),
@@ -167,10 +204,18 @@ def run(las_paths, out_dir, preset="clear", workers=None, cell_m=None,
 
     budget = _budget_bytes(memory_gb)
     charge = {q: os.path.getsize(q) * MEMORY_FACTOR for q in todo}
+    # Threads per worker come from how many tiles will actually be in flight,
+    # which memory decides, not from the worker count. The median charge is used
+    # rather than the largest: a run sized on its biggest tile would give every
+    # worker far too many threads for the hundreds of ordinary ones.
+    med = float(np.median(list(charge.values()))) if charge else budget
+    concurrent = int(max(1, min(workers, budget // max(med, 1))))
+    threads = int(max(1, min(16, (os.cpu_count() or 2) // concurrent)))
     if verbose:
-        print("memory budget %.0f GB; largest tile charged %.1f GB"
-              % (budget / (1 << 30), max(charge.values()) / (1 << 30)),
-              flush=True)
+        print("memory budget %.0f GB; largest tile charged %.1f GB; "
+              "expect %d tiles at once, %d threads each of %d cores"
+              % (budget / (1 << 30), max(charge.values()) / (1 << 30),
+                 concurrent, threads, os.cpu_count() or 0), flush=True)
 
     t0, n_ok, n_bad, done_n = time.time(), 0, 0, 0
     pending, running, committed = list(todo), {}, 0
@@ -188,7 +233,7 @@ def run(las_paths, out_dir, preset="clear", workers=None, cell_m=None,
                 pending.pop(0)
                 committed += charge[nxt]
                 fut = pool.submit(_one, (nxt, out_dir, preset, cell_m, make_g1,
-                                         keep_ground, rvt_script))
+                                         keep_ground, rvt_script, threads))
                 running[fut] = nxt
             finished, _ = cf.wait(running, return_when=cf.FIRST_COMPLETED)
             for fut in finished:
@@ -269,7 +314,10 @@ def main(argv=None):
             paths += sorted(glob.glob(os.path.join(item, "**", "*.la[sz]"),
                                       recursive=True))
         else:
-            hits = sorted(glob.glob(item))
+            # recursive, so a ** in the pattern means what it looks like it
+            # means. Without it "root/**/*.las" quietly matches nothing and the
+            # run exits having done no work.
+            hits = sorted(glob.glob(item, recursive=True))
             paths += hits if hits else [item]
     paths = [q for q in dict.fromkeys(paths) if os.path.isfile(q)]
     if not paths:
