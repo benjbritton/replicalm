@@ -38,8 +38,8 @@ commands to run are below.
 - Tag: `v1.0.0` → `a41e3af` ("Remove a stray backspace byte from the README
   build command", 2026-09-24 12:37)
 - Remotes: none
-- History: 34 commits, all authored by Benjamin Jay Britton
-  <benjaminbritton@yahoo.com>, no tool trailers
+- History: all commits authored by Benjamin Jay Britton under the account's
+  GitHub noreply address, no tool trailers
 - Tracked content: 251 files, 54 MB
 
 ## The installer
