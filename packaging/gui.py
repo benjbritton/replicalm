@@ -9,9 +9,18 @@ a result can be traced to a configuration.
 tkinter rather than PySide: it ships with Python, adds nothing to the installer,
 and this needs a dozen widgets and a log pane.
 
-Processing runs on a worker thread. Classification and kriging on a full tile
-take minutes to hours, and a frozen window that may or may not be working is
-worse than a slow one that says what it is doing.
+Processing runs in a CHILD PROCESS, not a thread. It used to be a thread, and
+long numpy and PDAL operations hold the interpreter lock for stretches of
+several seconds, so the main thread could not service its own timer: the window
+stopped repainting and Windows appended "(Not Responding)" to the title. That
+was accurate rather than a false alarm. In a child process nothing competes for
+this process's lock, so the window stays live for the whole run -- and a child
+can be terminated, which is what makes Cancel possible at all. A Python thread
+cannot be stopped part-way through a kriging.
+
+The protocol is one JSON object per line on the child's stdout; see
+`replicalm.worker`. The only thread here reads those lines and does nothing
+else, so it cannot starve the window either.
 
 WHAT CHANGED SINCE 1.0
 ----------------------
@@ -40,7 +49,6 @@ import os
 import queue
 import sys
 import threading
-import traceback
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -74,9 +82,18 @@ RESOLUTIONS = [
 # The interpolation neighbourhood: two measured choices rather than four free
 # numbers, because the pair moves together -- 64 points only condition well
 # inside a radius wide enough to hold them.
+#
+# 16 is first and is the default, although 64 is the figure the source method
+# specifies and measured slightly better. The margin does not pay for the time:
+# on a tile at 4.2 ground returns per square metre, 64 bought half a point of
+# coverage and a tenth of a percent of texture for nine times the interpolation,
+# and the corpus median density is nearer that tile than the sparse one. On a
+# genuinely sparse survey -- under one return per square metre -- 64 earns it,
+# with 3.8 points more coverage and a visibly closer match to the reference's
+# texture, which is why it stays on the menu.
 NEIGHBOURHOODS = [
-    ("published — 64 points within 20 m", "published"),
-    ("fast — 16 points, radius from density", "fast"),
+    ("standard — 16 points, radius from density", "fast"),
+    ("published — 64 points within 20 m, slower", "published"),
 ]
 
 POINT_CLOUD_TYPES = [("Point clouds", "*.las *.laz"), ("All files", "*.*")]
@@ -93,10 +110,15 @@ class App(tk.Tk):
         self.title(APP)
         self.minsize(780, 500)
         self.messages = queue.Queue()
-        self.worker = None
+        self.worker = None          # the reader thread, not the processing
+        self.proc = None            # the child doing the work
+        self.cancelled = False
         self.inputs = []            # files and folders, in the order chosen
         self._build()
+        # The ground-stage selector is meaningless until saving is asked for.
+        self._toggle_ground_stage()
         self.after(120, self._drain)
+        self.protocol("WM_DELETE_WINDOW", self._close)
 
     # ---------------------------------------------------------------- layout
     def _build(self):
@@ -182,19 +204,30 @@ class App(tk.Tk):
         ttk.Label(opts, text="Ground threshold (m)").pack(side="left")
         ttk.Entry(opts, textvariable=self.threshold, width=7).pack(
             side="left", padx=(6, 18))
-        ttk.Checkbutton(opts, text="Keep ground points",
-                        variable=self.keep).pack(side="left")
-        ttk.Combobox(opts, textvariable=self.ground_stage, width=18,
-                     state="readonly",
-                     values=("after cleanup", "before cleanup")).pack(
-                         side="left", padx=(6, 0))
+        # "Keep ground points" said nothing about what it kept or where it went,
+        # and the after/before selector sat beside it at equal weight meaning
+        # nothing to anyone who did not already know what the cleanup was. The
+        # selector now only appears once the box is ticked.
+        ttk.Checkbutton(opts, text="Save ground-filtered point cloud (LAZ)",
+                        variable=self.keep,
+                        command=self._toggle_ground_stage).pack(side="left")
+        self.stage_box = ttk.Combobox(opts, textvariable=self.ground_stage,
+                                      width=18, state="readonly",
+                                      values=("after cleanup",
+                                              "before cleanup"))
+        self.stage_box.pack(side="left", padx=(6, 0))
         frm.columnconfigure(1, weight=1)
 
-        # A departure from the defaults is a claim about this survey, so the
-        # window asks for it in words and stores the answer beside the output.
+        # Whatever is typed here is stored in the settings file beside the
+        # output, so a result can carry the operator's own account of why it was
+        # produced that way. It used to be called "Reason for changing" and a
+        # modal appeared if it was left empty while anything differed from the
+        # defaults -- which interrupted the person who chose those defaults to
+        # imply they had done something questionable. The field earns its place;
+        # the interrogation did not.
         rs = ttk.Frame(frm)
         rs.grid(row=6, column=1, sticky="ew", pady=(6, 0))
-        ttk.Label(rs, text="Reason for changing").pack(side="left")
+        ttk.Label(rs, text="Processing notes (optional)").pack(side="left")
         ttk.Entry(rs, textvariable=self.reason).pack(side="left", fill="x",
                                                      expand=True, padx=(6, 0))
 
@@ -202,6 +235,9 @@ class App(tk.Tk):
         runbar.pack(fill="x", padx=10)
         self.run_btn = ttk.Button(runbar, text="Run", command=self._run)
         self.run_btn.pack(side="left")
+        self.cancel_btn = ttk.Button(runbar, text="Cancel",
+                                     command=self._cancel, state="disabled")
+        self.cancel_btn.pack(side="left", padx=(6, 0))
         self.progress = ttk.Progressbar(runbar, mode="determinate",
                                         maximum=1.0)
         self.progress.pack(side="left", fill="x", expand=True, padx=10)
@@ -219,6 +255,25 @@ class App(tk.Tk):
     # ---------------------------------------------------------------- helpers
     def _describe_profile(self, _event=None):
         self.profile_note.configure(text=PROFILES[self.profile.get()][1])
+
+    def _toggle_ground_stage(self):
+        """Only show which ground to save once saving it has been asked for."""
+        self.stage_box.configure(
+            state="readonly" if self.keep.get() else "disabled")
+
+    def _close(self):
+        """Closing the window must not leave a child processing in the dark."""
+        if self.proc is not None and self.proc.poll() is None:
+            if not messagebox.askokcancel(
+                    APP, "Processing is still running. Close anyway and stop "
+                         "it?"):
+                return
+            self.cancelled = True
+            try:
+                self.proc.terminate()
+            except Exception:
+                pass
+        self.destroy()
 
     def _add_inputs(self, paths):
         added = 0
@@ -287,8 +342,14 @@ class App(tk.Tk):
             elif kind == "fraction":
                 self.progress["value"] = payload
             elif kind == "done":
+                # Back to exactly the pre-Run state, with every selection the
+                # operator made still filled in. A cancelled run (payload None)
+                # leaves the bar where it stopped rather than claiming either
+                # completion or failure.
                 self.run_btn.configure(state="normal")
-                self.progress["value"] = 1.0 if payload else 0.0
+                self.cancel_btn.configure(state="disabled")
+                if payload is not None:
+                    self.progress["value"] = 1.0 if payload else 0.0
         self.after(120, self._drain)
 
     # ------------------------------------------------------------------- run
@@ -323,36 +384,11 @@ class App(tk.Tk):
 
         neighbourhood = dict(NEIGHBOURHOODS)[self.neighbourhood.get()]
 
-        # Not enforced -- a required box teaches people to type a full stop --
-        # but asked for once, and recorded either way.
-        changed = [n for n, v in (
-            ("method", self.profile.get() != "Clear"),
-            ("resolution", cell is not None),
-            ("ground threshold", threshold is not None),
-            ("interpolation", neighbourhood != NEIGHBOURHOODS[0][1]))
-            if v]
-        if changed and not self.reason.get().strip():
-            gap = "\n\n"
-            if not messagebox.askokcancel(
-                    APP,
-                    "You have changed %s from the default."
-                    % " and ".join(changed) + gap
-                    + "The defaults are what the measurements behind the "
-                      "locked baseline were taken at. If this survey needs "
-                      "something else, saying why in the Reason box records it "
-                      "beside the output." + gap + "Run anyway?"):
-                return
-
-        self.run_btn.configure(state="disabled")
-        self.progress["value"] = 0.0
         self._say("")
-        self.worker = threading.Thread(
-            target=self._work,
-            args=(list(self.inputs), out, cell, self.g1.get(), self.keep.get(),
-                  self.profile.get(), threshold, neighbourhood,
-                  self.reason.get().strip(), self.ground_stage.get()),
-            daemon=True)
-        self.worker.start()
+        self._start(list(self.inputs), out, cell, self.g1.get(),
+                    self.keep.get(), self.profile.get(), threshold,
+                    neighbourhood, self.reason.get().strip(),
+                    self.ground_stage.get())
 
     # ------------------------------------------------------------------ work
     @staticmethod
@@ -386,83 +422,176 @@ class App(tk.Tk):
             lines.append("reason recorded: %s" % reason)
         return cfg, lines
 
-    def _work(self, inputs, out, cell, make_g1, keep, profile, threshold,
-              neighbourhood, reason, ground_stage_label="after cleanup"):
-        q = self.messages
-        # the control reads in words; the pipeline takes a keyword
+    def _child_python(self):
+        """python.exe beside this interpreter.
+
+        The launcher runs the window under pythonw.exe so no console appears
+        behind it. A child started from pythonw has no usable stdout, and the
+        whole protocol is stdout, so the console build is used for the child.
+        """
+        exe = sys.executable or ""
+        for a, b in (("pythonw.exe", "python.exe"), ("pythonw", "python")):
+            if exe.endswith(a):
+                candidate = exe[:-len(a)] + b
+                if os.path.exists(candidate):
+                    return candidate
+        return exe
+
+    def _start(self, inputs, out, cell, make_g1, keep, profile, threshold,
+               neighbourhood, reason, ground_stage_label):
+        """Write the job, launch the child, and read it on a reader thread."""
+        import json
+        import subprocess
+        import tempfile
+
         ground_stage = ("before" if str(ground_stage_label).startswith("before")
                         else "after")
-
-        def progress(stage, message, fraction=None):
-            q.put(("log", "[%-11s] %s" % (stage, message)))
-            q.put(("status", message))
-            if fraction is not None:
-                q.put(("fraction", fraction))
-
         try:
-            from replicalm import batch, pipeline
+            from replicalm import batch
             cfg, lines = self._configure(profile, threshold, neighbourhood,
                                          reason)
-            for line in lines:
-                q.put(("log", line))
-
             clouds = batch.collect_inputs(inputs)
-            if not clouds:
-                q.put(("log", "no .las or .laz files found in what was added"))
-                q.put(("status", "Nothing to do"))
-                q.put(("done", False))
-                return
-            q.put(("log", "%d point cloud%s to process"
-                          % (len(clouds), "" if len(clouds) == 1 else "s")))
-            q.put(("log", ""))
-
-            failed = 0
-            for i, cloud in enumerate(clouds, start=1):
-                q.put(("log", "--- %d of %d: %s"
-                              % (i, len(clouds), os.path.basename(cloud))))
-                base = (i - 1) / len(clouds)
-                span = 1.0 / len(clouds)
-
-                def scaled(stage, message, fraction=None, _b=base, _s=span):
-                    progress(stage, message,
-                             None if fraction is None else _b + _s * fraction)
-
-                try:
-                    result = pipeline.process(cloud, out, cfg=cfg,
-                                              cell_m=cell, make_g1=make_g1,
-                                              keep_ground=keep,
-                                              ground_stage=ground_stage,
-                                              progress=scaled)
-                except Exception as exc:
-                    failed += 1
-                    q.put(("log", "FAILED: %s" % exc))
-                    continue
-                self._report(q, result)
-
-            q.put(("log", ""))
-            q.put(("status", "Finished %d of %d"
-                             % (len(clouds) - failed, len(clouds))))
-            q.put(("done", failed == 0))
         except Exception as exc:
+            self._say("FAILED before starting: %s" % exc)
+            return
+        if not clouds:
+            self._say("no .las or .laz files found in what was added")
+            self.status.configure(text="Nothing to do")
+            return
+        for line in lines:
+            self._say(line)
+        self._say("%d point cloud%s to process"
+                  % (len(clouds), "" if len(clouds) == 1 else "s"))
+        self._say("")
+
+        self._jobdir = tempfile.mkdtemp(prefix="replicalm_job_")
+        cfg_path = os.path.join(self._jobdir, "config.json")
+        cfg.to_json(cfg_path)
+        job_path = os.path.join(self._jobdir, "job.json")
+        with open(job_path, "w", encoding="utf-8") as fh:
+            json.dump({"config": cfg_path, "out": out, "clouds": clouds,
+                       "cell_m": cell, "make_g1": bool(make_g1),
+                       "keep_ground": bool(keep),
+                       "ground_stage": ground_stage}, fh)
+
+        src = os.path.join(HERE, "src")
+        env = dict(os.environ)
+        if os.path.isdir(src):
+            env["PYTHONPATH"] = src + os.pathsep + env.get("PYTHONPATH", "")
+        # CREATE_NO_WINDOW so the child does not flash a console window. The
+        # flag only exists on Windows.
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        try:
+            self.proc = subprocess.Popen(
+                [self._child_python(), "-u", "-m", "replicalm.worker",
+                 job_path],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding="utf-8", errors="replace",
+                env=env, creationflags=flags)
+        except Exception as exc:
+            self._say("FAILED to start the processing job: %s" % exc)
+            return
+
+        self.cancelled = False
+        self.run_btn.configure(state="disabled")
+        self.cancel_btn.configure(state="normal")
+        self.progress["value"] = 0.0
+        self.worker = threading.Thread(target=self._read_child, daemon=True)
+        self.worker.start()
+
+    def _read_child(self):
+        """Blocking readline on the child, forwarded to the window's queue.
+
+        This thread does nothing but read, so it cannot hold the interpreter
+        lock long enough to stop the window repainting -- which is the whole
+        reason the processing moved out of process.
+        """
+        import json
+        q = self.messages
+        proc = self.proc
+        try:
+            for line in proc.stdout:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    msg = json.loads(line)
+                except ValueError:
+                    # Not ours. Show it rather than swallow it: a message nobody
+                    # sees is how the image step stayed broken for a release.
+                    q.put(("log", line))
+                    continue
+                self._handle(q, msg)
+        except Exception as exc:
+            q.put(("log", "lost contact with the processing job: %s" % exc))
+        code = proc.wait()
+        if self.cancelled:
             q.put(("log", ""))
-            q.put(("log", "FAILED: %s" % exc))
-            q.put(("log", traceback.format_exc(limit=3)))
+            q.put(("log", "Cancelled. Whatever had already finished is on "
+                          "disk; nothing further was written."))
+            q.put(("status", "Cancelled"))
+            q.put(("done", None))
+        elif code not in (0, 1):
+            q.put(("log", "the processing job stopped unexpectedly (exit %s)"
+                          % code))
             q.put(("status", "Failed"))
             q.put(("done", False))
+
+    def _handle(self, q, msg):
+        """One message from the child onto the window's queue."""
+        kind = msg.get("t")
+        if kind == "progress":
+            q.put(("log", "[%-11s] %s" % (msg.get("stage", ""),
+                                          msg.get("message", ""))))
+            q.put(("status", msg.get("message", "")))
+            if msg.get("fraction") is not None:
+                q.put(("fraction", msg["fraction"]))
+        elif kind == "file":
+            q.put(("log", "--- %d of %d: %s"
+                          % (msg["index"], msg["of"],
+                             os.path.basename(msg["path"]))))
+        elif kind == "result":
+            self._report(q, msg)
+        elif kind == "error":
+            q.put(("log", "FAILED: %s" % msg.get("message", "")))
+        elif kind == "done":
+            q.put(("log", ""))
+            total = msg.get("ok", 0) + msg.get("failed", 0)
+            q.put(("status", "Finished %d of %d" % (msg.get("ok", 0), total)))
+            q.put(("done", not msg.get("failed")))
+
+    def _cancel(self):
+        """Stop processing and put the window back as it was before Run.
+
+        Terminating a child is the whole reason the work is in one. A thread
+        could not be stopped part-way through a kriging at all.
+        """
+        proc = getattr(self, "proc", None)
+        if proc is None or proc.poll() is not None:
+            return
+        self.cancelled = True
+        self.cancel_btn.configure(state="disabled")
+        self.status.configure(text="Stopping...")
+        self._say("")
+        self._say("stopping the processing job...")
+        try:
+            proc.terminate()
+        except Exception as exc:
+            self._say("could not stop it cleanly: %s" % exc)
 
     @staticmethod
     def _report(q, result):
         q.put(("log", "DEM written: %s" % result["dem"]))
         if result.get("ground_las"):
-            q.put(("log", "Ground (%s cleanup): %s"
-                          % (result["ground_stage"], result["ground_las"])))
-        q.put(("log", "%d ground points, %.2f per m², cell %.2f m, "
+            q.put(("log", "Ground-filtered cloud (%s cleanup): %s"
+                          % (result.get("ground_stage"), result["ground_las"])))
+        q.put(("log", "%d ground points, %.2f per m\u00b2, cell %.2f m, "
                       "radius %.2f m"
                       % (result["ground_points"], result["density"],
                          result["cell_m"], result["search_radius_m"])))
         q.put(("log", "%d cells kept after trimming %d from the edge"
                       % (result["cells_after_trim"], result["erode_cells"])))
-        if result["filled_cells"]:
+        if result.get("filled_cells"):
             q.put(("log", "%d cells interpolated across holes (%.3f%%)"
                           % (result["filled_cells"],
                              100 * result["filled_fraction"])))
@@ -477,6 +606,7 @@ class App(tk.Tk):
             q.put(("log", "image step not completed: %s"
                           % (g1.get("skipped") or g1.get("failed"))))
         q.put(("log", "finished in %.0f s" % result["seconds"]))
+
 
 
 if __name__ == "__main__":
