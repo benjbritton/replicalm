@@ -11,27 +11,30 @@ WHAT IT DOES
     interpolate   kriging onto a declared grid, radius scaled to point density
     finalise      fill enclosed holes, trim the one-sided fringe, write with
                   zero meaning no data
-    visualize     optional, and a shell-out rather than a reimplementation
+    visualize     optional: the G1 composite and the four layers it blends
 
-THE VISUALIZATION IS SOMEONE ELSE'S RECIPE
-------------------------------------------
-G1 is the four-layer blend published as Table 3 of Britton et al. 2025, and the
-script that produces it (`GLiHT_rvt.py`) belongs to that work rather than to
-this package. It is called, not copied, so that one definition of the recipe
-exists and this package cannot drift from it.
+THE VISUALIZATION USED TO BE A SHELL-OUT AND DID NOT WORK
+---------------------------------------------------------
+G1 is the four-layer blend published as Table 3 of Britton et al. 2025. This
+module used to call `GLiHT_rvt.py` for it, found beside the interpreter or at a
+path on the machine the script was written on, so that one definition of the
+recipe existed and this package could not drift from it. That was the right
+instinct and the wrong mechanism: the script is not in the installer, so on
+every user's machine the step returned "GLiHT_rvt.py not found", left the DEM
+alone, and reported it only in a log line nobody reads. The feature was absent
+rather than optional.
 
-It is also optional. It needs `rvt-py`, which is Apache 2.0 from ZRC SAZU and
-the University of Ljubljana, and which pulls in GDAL and matplotlib. A run that
-only wants elevation should not have to install any of that, so the import and
-the call are deferred and their absence is reported rather than raised.
+The recipe is now in `replicalm.visualize`, which calls `rvt.vis` as a library.
+`rvt-py` was already pinned in packaging/environment.yml and already shipped,
+so this costs no new dependency and nothing in installer size. The import stays
+deferred: a run that only wants elevation should not need the visualization
+stack present, and its absence is reported rather than raised.
 
-Point the shell-out at the script with REPLICALM_RVT_SCRIPT, or pass
-`rvt_script=`. Without it, `process` produces the DEM and says plainly that the
-image step was skipped.
+What it writes is G1 and its four source layers under `<out>/G1/`, and nothing
+else. RVT remains the tool for relief visualization; this renders one image so
+the operator can look at what the ground filter produced.
 """
 import os
-import subprocess
-import sys
 import time
 
 import numpy as np
@@ -46,7 +49,7 @@ def _noop(stage, message, fraction=None):
 
 
 def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
-            rvt_script=None, progress=None, keep_ground=True,
+            progress=None, keep_ground=True,
             derive_cell=True, grid=None, on_grid=None,
             reuse_ground=False, ground_stage="after"):
     """Process one tile. Returns a dict describing everything written.
@@ -265,59 +268,35 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
 
     if make_g1:
         progress("visualize", "building the G1 composite", 0.85)
-        out["g1"] = visualize(dem_path, out_dir, rvt_script=rvt_script,
+        out["g1"] = visualize(dem_path, out_dir,
                               progress=progress)
     progress("done", "finished in %.0f s" % (time.time() - t0), 1.0)
     return out
 
 
-def find_rvt_script(explicit=None):
-    """Locate GLiHT_rvt.py, or return None. Never raises."""
-    for candidate in (explicit, os.environ.get("REPLICALM_RVT_SCRIPT"),
-                      os.path.join(os.path.dirname(sys.executable),
-                                   "GLiHT_rvt.py"),
-                      r"C:\g1\tools\GLiHT_rvt.py"):
-        if candidate and os.path.isfile(candidate):
-            return candidate
-    return None
+def visualize(dem_path, out_dir, progress=None, keep_layers=True, **_legacy):
+    """The G1 composite and its four source layers, under `<out_dir>/G1/`.
 
+    Delegates to `replicalm.visualize`, which calls rvt as a library. Returns
+    what was written, or a dict saying why nothing was -- the DEM is the
+    product and a missing visualization stack must not fail a run that has
+    already produced one.
 
-def visualize(dem_path, out_dir, rvt_script=None, res="0p5m", progress=None):
-    """Produce the G1 composite by calling the published recipe.
-
-    Returns the output directory, or a dict explaining why nothing was made.
-    The recipe expects DEMs named `*_DEM_<res>_v1.tif` under a root it walks,
-    so the DEM is linked into that shape rather than renamed in place.
+    `**_legacy` swallows `rvt_script=` and `res=`, which the shell-out needed
+    and this does not. Callers that still pass them keep working.
     """
     progress = progress or _noop
-    script = find_rvt_script(rvt_script)
-    if not script:
-        progress("visualize", "GLiHT_rvt.py not found; set REPLICALM_RVT_SCRIPT "
-                              "to enable the image step. DEM is unaffected.")
-        return {"skipped": "GLiHT_rvt.py not found"}
-
-    stem = os.path.splitext(os.path.basename(dem_path))[0]
-    staged_root = os.path.join(out_dir, "_rvt_in")
-    staged_dir = os.path.join(staged_root, "tile")
-    os.makedirs(staged_dir, exist_ok=True)
-    staged = os.path.join(staged_dir, "%s_DEM_%s_v1.tif" % (stem, res))
-    if not os.path.exists(staged):
-        try:
-            os.link(dem_path, staged)          # cheap; same volume
-        except OSError:
-            import shutil
-            shutil.copy2(dem_path, staged)
-
-    rvt_root = os.path.join(out_dir, "rvt")
-    cmd = [sys.executable, script, "--res", res, "--no-metadata",
-           "--workers", "1", "--dem-root", staged_root, "--rvt-root", rvt_root]
-    progress("visualize", "running %s" % os.path.basename(script))
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-3:]
-        progress("visualize", "the image step failed: %s" % " / ".join(tail))
-        return {"failed": proc.returncode, "stderr": "\n".join(tail)}
-    return {"rvt_root": rvt_root}
+    try:
+        from . import visualize as _vis
+    except ImportError as exc:                       # pragma: no cover
+        progress("visualize", "the image step is unavailable: %s" % exc)
+        return {"skipped": str(exc)}
+    try:
+        return _vis.g1(dem_path, out_dir, keep_layers=keep_layers,
+                       progress=progress)
+    except Exception as exc:
+        progress("visualize", "the image step failed: %s" % exc)
+        return {"failed": str(exc)}
 
 
 def main(argv=None):
@@ -333,7 +312,17 @@ def main(argv=None):
     p.add_argument("las", help="input LAS or LAZ")
     p.add_argument("-o", "--out", default=".", help="output directory")
     p.add_argument("--cell", type=float, default=None,
-                   help="output cell size in metres (default 1.0)")
+                   help="output cell size in metres; default is derived from "
+                        "measured ground-return density")
+    # The same control in the units people ask for it in. The relationship is
+    # quadratic -- 4 px/m2 is a 0.50 m cell, not 0.25 -- so this exists to stop
+    # that conversion being done wrongly by hand. Squares only, because those
+    # are the values that land on round cell sizes.
+    p.add_argument("--pixels-per-m2", type=int, default=None, metavar="N",
+                   choices=(1, 4, 9, 16, 25),
+                   help="output resolution as pixels per square metre: 1 is "
+                        "1.00 m cells, 4 is 0.50 m, 9 is 0.33 m, 16 is 0.25 m, "
+                        "25 is 0.20 m. An alternative to --cell")
     p.add_argument("--g1", action="store_true", help="also build the G1 image")
     p.add_argument("--keep-ground", action="store_true",
                    help="save the ground returns as LAZ beside the DEM")
@@ -347,8 +336,16 @@ def main(argv=None):
                    help="which ground to save: 'after' the cleanup, the surface "
                         "the DEM was built from (default), or 'before' it, "
                         "which is where re-deriving the cleanup starts")
-    p.add_argument("--rvt-script", default=None,
-                   help="path to GLiHT_rvt.py for the image step")
+    # The interpolation neighbourhood. Offered as a pair because the two move
+    # together: 64 points only condition well inside a radius wide enough to
+    # hold them, and 16 inside a fixed 20 m lose matrix rank on dense data.
+    # "published" is the source's own figure and measured better or neutral on
+    # both test tiles; "fast" is 7 to 9 times quicker to interpolate.
+    p.add_argument("--interpolation", choices=("published", "fast"),
+                   default=None,
+                   help="published: 64 points within a fixed 20 m, the source's "
+                        "neighbourhood and the profile default. fast: 16 points "
+                        "with the radius from density, 7-9x quicker")
     p.add_argument("--profile", "--preset", dest="preset",
                    default="clear", choices=sorted(PRESETS),
                    help="baseline | clear (default) | deep")
@@ -413,10 +410,34 @@ def main(argv=None):
 
     if a.slope_aware_cleanup:
         cfg = replace(cfg, clean_slope_aware=True)
-    out = process(a.las, a.out, cfg=cfg, cell_m=a.cell,
-                  make_g1=a.g1, rvt_script=a.rvt_script, progress=show,
+    if a.interpolation == "fast":
+        cfg = replace(cfg, max_points=16, min_points=3,
+                      search_radius_mode="density", search_radius_m=None)
+    elif a.interpolation == "published":
+        cfg = replace(cfg, max_points=64, min_points=1,
+                      search_radius_mode="fixed", search_radius_m=20.0)
+
+    cell = a.cell
+    if a.pixels_per_m2 is not None:
+        if a.cell is not None:
+            p.error("give --cell or --pixels-per-m2, not both")
+        cell = (1.0 / a.pixels_per_m2) ** 0.5
+        print("resolution %d px/m2 is a %.4f m cell"
+              % (a.pixels_per_m2, cell))
+
+    out = process(a.las, a.out, cfg=cfg, cell_m=cell,
+                  make_g1=a.g1, progress=show,
                   keep_ground=a.keep_ground, ground_stage=a.ground_stage)
     print("\nDEM: %s" % out["dem"])
+    g1 = out.get("g1")
+    if isinstance(g1, dict) and g1.get("g1"):
+        print("G1: %s" % g1["g1"])
+        if g1.get("layers"):
+            print("G1 source layers: %s"
+                  % os.path.dirname(next(iter(g1["layers"].values()))))
+    elif isinstance(g1, dict):
+        print("image step not completed: %s"
+              % (g1.get("skipped") or g1.get("failed")))
     if out.get("ground_las"):
         print("Ground (%s cleanup): %s" % (out["ground_stage"],
                                            out["ground_las"]))

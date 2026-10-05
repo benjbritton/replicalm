@@ -35,9 +35,25 @@ conda-forge for exactly this reason.
 **G-LiHT data.** The point clouds and reference surfaces are NASA products from
 the AMIGACarb and Yucatan campaigns and are not included.
 
-**The G1 recipe.** `GLiHT_rvt.py` implements the composite published as Table 3
-of Britton et al. 2025 and belongs to that work. Replicalm calls it if it is
-present and reports its absence otherwise; it is not bundled.
+**The G1 recipe.** The composite published as Table 3 of Britton et al. 2025.
+Until 1.1 Replicalm called an external script, `GLiHT_rvt.py`, which belonged to
+that work and was not bundled -- so on any machine but the author's the image
+step did nothing. From 1.1 the recipe is implemented in
+`replicalm/visualize.py`, which reproduces it exactly: on a full 2,890 x 15,950
+tile the two agree on 100.0000% of pixels, with a maximum difference of zero
+levels.
+
+That implementation computes four visualizations through `rvt.vis` and blends
+them. The blending arithmetic -- per-layer min-max normalisation, brightness,
+contrast, gamma as power(x, 1/gamma), and the normal, difference, overlay and
+multiply modes -- is Replicalm's own code following the published table. The
+visualizations themselves are RVT's, called as a library and unmodified: no part
+of `rvt-py` is copied, patched or vendored, and Replicalm does not reimplement
+hillshade, slope, positive openness or sky-view factor.
+
+Replicalm writes only the G1 composite and those four source layers. It does not
+produce RVT's own product set and is not an alternative to it; for the full range
+of relief visualizations and control over their parameters, use RVT directly.
 
 ## Citation
 
