@@ -26,10 +26,18 @@ within 25 cm of the reference from 17% to 58%.
 stops changing, so the larger value was costing two and a half times the
 classification time for identical results.
 
-**Interpolation uses the published neighbourhood** — 64 ground points inside a
-fixed 20 m, which is what the source method specifies. It makes the surface
-texture closer to the reference and fills more of the map, at the cost of
-slower interpolation. The faster 1.0 setting is still selectable.
+**It is faster than 1.0 as well as better.** Measured on a tile of 14 million
+ground returns, 1.0 took 6,198 seconds and 1.1 takes 2,513 — **2.5 times
+quicker**. The maximum filter window did it: above 32 m the ground filter's
+output stops changing, so 1.0's 70 m was costing two and a half times the
+classification time for identical results.
+
+**The source's larger interpolation neighbourhood is selectable, not the
+default** — 64 ground points inside a fixed 20 m, against the standard 16. It
+makes the surface texture closer to the reference and fills more of the map, but
+on a tile near the usual return density it bought half a point of coverage for
+nine times the interpolation time. Worth choosing on a sparse survey; not worth
+paying for on every tile.
 
 **The G1 image now works.** In 1.0 the checkbox called a script that was not in
 the installer, so on every machine it quietly did nothing and left the elevation
@@ -133,16 +141,17 @@ Each output cell is estimated by kriging from the ground returns around it. Two
 things control that: how many returns are averaged, and how far out it looks.
 They move together, so they are offered as one choice rather than two numbers.
 
-**published** — 64 returns inside a fixed 20 m. This is the neighbourhood the
-source method specifies. On a sparse tile it brings the surface texture from 35%
-rougher than the reference to 18%, and fills 90.9% of the reference's cells
-rather than 86.6%. On a dense tile it changes the texture by a tenth of a
-percent and still fills more of the map.
+**standard** — 16 returns, with the distance worked out from how dense the
+returns are. This is the default and what 1.0 used.
 
-**fast** — 16 returns, with the distance worked out from how dense the returns
-are. This is what 1.0 used. It interpolates **seven to nine times faster** and
-gives up some of the texture improvement. On a small survey the difference in
-wall-clock time is minutes; on hundreds of tiles it is days.
+**published** — 64 returns inside a fixed 20 m, the neighbourhood the source
+method specifies. On a sparse tile, under one return per square metre, it brings
+the surface texture from 35% rougher than the reference to 18% and fills 90.9%
+of the reference's cells rather than 86.6%. On a tile at four returns per square
+metre it changes the texture by a tenth of a percent and fills half a point
+more — for **seven to nine times the interpolation time**. That is why it is not
+the default: the gain is real but concentrated on sparse surveys, and the cost
+applies to every tile. On hundreds of tiles the difference is days.
 
 Neither setting changes where the surface sits. Across four very different
 neighbourhoods the elevation moved by less than 6 mm — the accuracy comes from
@@ -256,11 +265,20 @@ the message pane says what went wrong.
 surface from. Usually the cloud is very sparse, covers mostly water or canopy,
 or has already been filtered to non-ground returns.
 
-**It is slower than 1.0** — the published interpolation neighbourhood is seven
-to nine times more work than 1.0's. Classification is two and a half times
-faster, so a whole tile comes out roughly 25% slower overall. Choose
-`interpolation: fast` to get 1.0's speed; you will give up some of the texture
-improvement and none of the accuracy.
+**A tile has no class 8 points, and the log said height above ground could not
+be computed** — the ground surface could not be triangulated on that tile, which
+is a defect in the bundled lidar library on certain large clouds. It has been
+seen on a tile of 55 million returns. Height above ground feeds only the class 8
+near-ground band and a check on absurd elevations; the ground classification and
+the elevation model are built without it and are unaffected. The same tile
+classified 18,119,998 ground returns either way, identical to the point. Nothing
+needs doing unless you want the class 8 band, in which case processing that tile
+with a newer build of the library produces it.
+
+**It is slower than you expected** — if you chose `interpolation: published`,
+that is seven to nine times the interpolation work of the standard setting. On
+the standard setting a tile is about two and a half times **faster** than 1.0,
+because the ground filter's window no longer does work that changes nothing.
 
 ## Licensing
 

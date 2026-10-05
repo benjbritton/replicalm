@@ -201,17 +201,39 @@ def classify_tile(in_path, out_path, cfg, verbose=True, srs=None):
     #
     # hag_delaunay triangulates the ground returns and measures to that
     # surface, which is what "above the ground model" means.
-    stages.append({"type": "filters.hag_delaunay"})
-    stages.append({"type": "filters.expression",
-                   "expression": "HeightAboveGround >= %g && "
-                                 "HeightAboveGround <= %g"
-                                 % (cfg.hag_low_cut_m, cfg.hag_high_cut_m)})
+    #
+    # It can also refuse the triangulation outright. On Centro GLAS l0s441 --
+    # 55,157,149 returns over 1,578 by 7,579 m -- it raised "All points
+    # collinear", which is Delaunator's message when it cannot find a
+    # non-degenerate seed triangle, and the whole tile was lost with it. A 500 m
+    # clip of the same tile classified 706,383 ground points at 2.83 per square
+    # metre, so the ground is there; the failure is at whole-tile scale. The
+    # likeliest reason is duplicate coordinates, which this data carries in
+    # quantity -- 13.05% of the returns on one tile, and enough to make the
+    # kriging system singular once before -- and which would explain why the
+    # same tile triangulated under the previous parameters and not under these:
+    # changing which returns are called ground changes which ones Delaunator
+    # sees first. That is a hypothesis, not a measurement.
+    #
+    # What is certain is that this stage is auxiliary. HeightAboveGround feeds
+    # the class 8 near-ground band and a sanity cut on absurd elevations; the
+    # DEM is built from class 2 and needs neither. So the stages below are kept
+    # separate, and `classify_tile` retries without them if PDAL refuses,
+    # reporting what the tile lost instead of losing the tile.
+    hag_stages = [
+        {"type": "filters.hag_delaunay"},
+        {"type": "filters.expression",
+         "expression": "HeightAboveGround >= %g && HeightAboveGround <= %g"
+                       % (cfg.hag_low_cut_m, cfg.hag_high_cut_m)},
+    ]
     lo, hi = cfg.near_ground_band_m
-    stages.append({"type": "filters.assign",
-                   "value": "Classification = %d WHERE "
-                            "HeightAboveGround > %g && HeightAboveGround < %g "
-                            "&& Classification != 2"
-                            % (cfg.near_ground_class, lo, hi)})
+    hag_stages.append({"type": "filters.assign",
+                       "value": "Classification = %d WHERE "
+                                "HeightAboveGround > %g && "
+                                "HeightAboveGround < %g && Classification != 2"
+                                % (cfg.near_ground_class, lo, hi)})
+    stages.extend(hag_stages)
+    hag_from = len(stages) - len(hag_stages)
 
     # step 7: ground and near-ground only, LAS 1.2
     keep = " || ".join("Classification == %d" % c for c in cfg.keep_classes)
@@ -239,7 +261,20 @@ def classify_tile(in_path, out_path, cfg, verbose=True, srs=None):
             writer["a_srs"] = found
     stages.append(writer)
 
-    pl, kept, fell_back = run_pipeline(stages, verbose=verbose)
+    try:
+        pl, kept, fell_back = run_pipeline(stages, verbose=verbose)
+        hag_ran = True
+    except Exception as exc:
+        # Only the height-above-ground stages are optional, so only their
+        # failure is survivable. Anything else is a real failure and is raised.
+        if not _is_triangulation_failure(exc):
+            raise
+        if verbose:
+            print("  height above ground could not be computed (%s); "
+                  "classifying without it" % str(exc).strip().splitlines()[0])
+        without = stages[:hag_from] + stages[hag_from + len(hag_stages):]
+        pl, kept, fell_back = run_pipeline(without, verbose=verbose)
+        hag_ran = False
 
     arr = pl.arrays[0] if pl.arrays else np.zeros(0)
     cls = arr["Classification"] if len(arr) else np.zeros(0, "u1")
@@ -251,7 +286,32 @@ def classify_tile(in_path, out_path, cfg, verbose=True, srs=None):
         print("  %-38s %8d kept  %8d ground  %7d class-%d"
               % (os.path.basename(str(in_path)), out["points_out"],
                  out["ground"], out["near_ground"], cfg.near_ground_class))
+    out["height_above_ground"] = hag_ran
+    if not hag_ran:
+        # Said plainly, because a degradation nobody is told about is how the
+        # image step stayed broken for a release.
+        out["warning"] = (
+            "the ground surface could not be triangulated, so height above "
+            "ground was not computed: this tile has no class %d near-ground "
+            "band and no cut on absurd elevations. The ground classification "
+            "and the DEM built from it are unaffected."
+            % cfg.near_ground_class)
+        if verbose:
+            print("  NOTE: %s" % out["warning"])
     if out["ground"] < cfg.min_ground_points:
         out["warning"] = ("only %d ground points; too few to rasterise honestly"
                           % out["ground"])
     return out
+
+
+def _is_triangulation_failure(exc):
+    """Is this PDAL refusing to triangulate, rather than something real?
+
+    Delaunator raises "All points collinear" when it cannot find a
+    non-degenerate seed triangle and "Cannot link edge" when the hull breaks;
+    both come out of `filters.hag_delaunay` as a plain runtime error with no
+    distinguishing type, so the message is all there is to match on.
+    """
+    text = str(exc).lower()
+    return ("collinear" in text or "cannot link edge" in text
+            or "hag_delaunay" in text)
