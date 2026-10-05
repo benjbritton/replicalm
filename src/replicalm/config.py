@@ -44,8 +44,14 @@ what each parameter controls rather than from any published correspondence:
 
   TerraScan window 70 m
       the largest structure the filter will step over. SMRF's `window` is the
-      maximum morphological window and does the same job, so it carries across
-      directly.
+      maximum morphological window and does the same job, but it does not
+      carry across directly: measured on synthetic flat-topped boxes, SMRF's
+      progressive opening stops changing its labels above 32 m at a 0.5 m
+      working cell, so 70 and 32 produce identical ground and 70 costs two and
+      a half times the time. The configured pass therefore uses 32. Note the
+      sign of the parameter -- `window` is the largest object the opening will
+      STRIP, not the largest it will preserve, so reducing it below the
+      saturation point is conservative rather than aggressive.
   TerraScan iteration angle 9 deg / 12 deg
       how steeply the TIN may be pushed toward a candidate point. SMRF has no
       angular term; its `slope` is a rise-over-run tolerance. tan(9 deg) = 0.158
@@ -200,16 +206,54 @@ class ReplicalmConfig:
     # classify.py as a divergence, and the measurement now says the divergence
     # costs nothing to make complete.
     #
-    # `threshold_m` is 0.5, not the source's 3.0, and `cell_m` is 0.5 rather
-    # than 1.0. The source's figures scored 17.68% error above 30 degrees
-    # against 10.34% for these. `cell_m` is the one parameter the source cannot
-    # specify, since TerraScan has no SMRF working grid; left coarser than the
-    # output cell it quantizes steep faces into steps, with terracing of 5.06%
-    # at 1 m, 2.44% at 0.5 m and 0.68% at 0.25 m. Tie it to `dem_cell_m`.
+    # `threshold_m` is 0.25, not the source's 3.0, and `cell_m` is 0.5 rather
+    # than 1.0. `cell_m` is the one parameter the source cannot specify, since
+    # TerraScan has no SMRF working grid; left coarser than the output cell it
+    # quantizes steep faces into steps, with terracing of 5.06% at 1 m, 2.44%
+    # at 0.5 m and 0.68% at 0.25 m. Tie it to `dem_cell_m`.
+    #
+    # `scalar` is 0.00 and `window_m` is 32, both changed from the values this
+    # file carried until 2026-10-04 (1.25 and 70). The three parameters were
+    # measured together on two full tiles at opposite ends of the corpus --
+    # l0s426 at 0.86 ground returns per square metre and 40 degrees of mean
+    # slope, l0s395 at 4.24 and 8.5 -- against each tile's archive surface on
+    # the archive's own lattice.
+    #
+    # `scalar` multiplies the slope-dependent part of SMRF's elevation
+    # tolerance, so on a steep face the effective threshold is far above
+    # whatever `threshold_m` names. On l0s426 the classification arrived 0.30 m
+    # above the archive on flat ground and 0.73 m above it past 40 degrees
+    # before any cleanup ran, and over half of what it called ground stood
+    # more than half a metre above the lowest return in its own cell. Zeroing
+    # the term took cells within 25 cm of the archive from 17.3% to 44.4%. It
+    # was then run on l0s395, where the classification already sat at
+    # +0.0002 m and a change could only cost: it improved every measure there
+    # too, halving the bias past 40 degrees.
+    #
+    # `threshold_m` 0.25 was the single largest remaining gain: flat-ground
+    # bias on l0s426 from +0.1062 to +0.0059 m and cells within 25 cm from
+    # 58.5% to 64.6%, and on l0s395 a semivariance of 0.00667 against the
+    # archive's own 0.00663 -- the closest texture match any configuration has
+    # produced on that tile. It removes 22% of the ground returns 0.5 m kept.
+    #
+    # `window_m` 32 is a runtime change and not an accuracy one. On synthetic
+    # flat-topped boxes the progressive opening's effect saturates at 32 m with
+    # a 0.5 m working cell: from 32 to 128 m the labels are identical, and the
+    # three real clips swept over 6 to 70 m returned identical ground counts.
+    # It cut l0s395's classification from 4,692 s to 1,888 s. Below 32 m the
+    # parameter is not inert -- it strips objects narrower than itself -- so
+    # this is a ceiling to stop at, not a direction to continue in.
+    #
+    # `slope` stays at tan 9 degrees. Raising it to tan 25 recovered 21% more
+    # ground returns on l0s426, exactly as a clip-level test predicted, and
+    # cost 10.9 points of accuracy doing it: the recovered returns were canopy
+    # that happened to be the only return in its cell, which is the error a
+    # per-cell test structurally cannot see. Measured in isolation and
+    # rejected.
     reset_classification: bool = True
     passes: list = field(default_factory=lambda: [
-        GroundPass(slope=_slope_from_angle(9.0), threshold_m=0.5, cell_m=0.5,
-                   reuse_ground=False,
+        GroundPass(slope=_slope_from_angle(9.0), threshold_m=0.25, cell_m=0.5,
+                   scalar=0.0, window_m=32.0, reuse_ground=False,
                    stands_in_for="TerraScan pass 1: 70 m, 88 deg, 9 deg, 3 m; "
                                  "pass 2 dropped, see the note above"),
     ])
@@ -386,11 +430,13 @@ class ReplicalmConfig:
 # steep ground, and all three were wrong.
 
 BASELINE = {
-    "locked": "2026-09-23",
+    "locked": "2026-10-04",
     "algorithm": "smrf",
     "passes": 1,
     "slope": 0.1584,            # tan 9 deg, the source's pass-1 iteration angle
     "cell_m": 0.5,
+    "scalar": 0.0,              # the slope-coupled tolerance, measured off
+    "window_m": 32.0,           # the opening's saturation point at this cell
     "remove_low_noise": False,  # ELM: inert on this data, 0.00% removed
     "remove_outliers": True,    # tile-dependent, see the note above
     "clean_height_m": 0.20,
@@ -404,7 +450,7 @@ BASELINE = {
     # they are locked per profile instead of globally. Everything above is the
     # same whichever profile runs.
     "profiles": {
-        "ncalm":    {"threshold_m": 0.50, "clean_vegetation": True,
+        "ncalm":    {"threshold_m": 0.25, "clean_vegetation": True,
                      "max_points": 16, "min_points": 3},
         # The replication target uses the source's own neighbourhood: 20 m
         # radius, up to 64 points, minimum 1 (Estrada-Belli et al. 2025
@@ -412,11 +458,11 @@ BASELINE = {
         # and 3 were chosen on their own merits and are kept for the other
         # profiles, but a configuration whose purpose is fidelity should not
         # differ from its target in the size of the neighbourhood it averages.
-        "baseline": {"threshold_m": 0.50, "clean_vegetation": False,
+        "baseline": {"threshold_m": 0.25, "clean_vegetation": False,
                      "max_points": 64, "min_points": 1},
-        "clear":    {"threshold_m": 0.50, "clean_vegetation": True,
+        "clear":    {"threshold_m": 0.25, "clean_vegetation": True,
                      "max_points": 16, "min_points": 3},
-        "deep":     {"threshold_m": 0.50, "clean_vegetation": True,
+        "deep":     {"threshold_m": 0.25, "clean_vegetation": True,
                      "max_points": 16, "min_points": 3},
     },
 }
@@ -450,7 +496,7 @@ def verify_baseline(cfg=None, profile=None):
                    % (len(cfg.passes), BASELINE["passes"]))
     if cfg.passes:
         p = cfg.passes[0]
-        for k in ("algorithm", "slope", "cell_m"):
+        for k in ("algorithm", "slope", "cell_m", "scalar", "window_m"):
             if getattr(p, k) != BASELINE[k]:
                 bad.append("%s: %r, baseline %r"
                            % (k, getattr(p, k), BASELINE[k]))
@@ -501,7 +547,32 @@ PRESETS = {
     # l8s431) and Clear still finds 6 to 12% afterwards. Together they put bias
     # within 3.3 mm of zero on all three tiles, the best of any arm, with no
     # sign of the overshoot that compounding two removals might have produced.
-    "clear": ReplicalmConfig(),
+    #
+    # The cleanup measures against a fitted plane rather than the 10th
+    # percentile of a disc, because the percentile sits at the downhill edge of
+    # that disc and so removes ground for being on a slope: on synthetic bare
+    # ground it took 90% of it at 25 degrees and 97% at 40. On l0s426 the
+    # percentile rule removed 65% of the classified ground and the plane rule
+    # at 1.20 m removes 14%, while landing closer to the archive on every
+    # measure -- cells within 25 cm 64.6% against 59.9%, and semivariance
+    # 0.14312 against 0.15292 on an archive of 0.10984. The 1.20 m fit radius
+    # was swept over 0.75 to 2.00 m on l0s395 and confirmed on l3s457 and
+    # l0s426; it is separate from `clean_patch_m` because the threshold wants a
+    # small neighbourhood and the plane has to BE the local surface, and a
+    # clump of scrub wider than the disc it is fitted over tilts the plane onto
+    # itself and escapes.
+    #
+    # Worth knowing before this is taken as settled: at 4.24 ground returns per
+    # square metre the cleanup has become nearly redundant. On l0s395 the
+    # classification alone now matches the best cleanup arm at 99.9% of cells
+    # within 25 cm and sits closer to the archive's texture than it does
+    # (0.00667 against 0.00633, archive 0.00663), so adding the plane rule
+    # there pushes the surface slightly below the reference rather than onto
+    # it. It earns its place at 0.86 returns per square metre and not at 4.24,
+    # which argues for making it density-conditional rather than a fixed
+    # property of the profile.
+    "clear": ReplicalmConfig(clean_slope_aware=True,
+                             clean_plane_patch_m=1.20),
 
     # The translation alone, with nothing removed beyond what the source method
     # removes. This is what the published comparison figures are measured
@@ -512,7 +583,8 @@ PRESETS = {
 
     # Clear on a grid finer than the point spacing. The extra resolution is for
     # rendering, not for accuracy -- see cell_factor.
-    "deep": ReplicalmConfig(cell_factor=0.7),
+    "deep": ReplicalmConfig(cell_factor=0.7, clean_slope_aware=True,
+                            clean_plane_patch_m=1.20),
     "ncalm_csf": ReplicalmConfig(passes=[
         GroundPass(algorithm="csf", csf_rigidness=2, csf_threshold_m=0.5,
                    stands_in_for="TerraScan pass 1, via cloth simulation"),
