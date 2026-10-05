@@ -340,13 +340,50 @@ class ReplicalmConfig:
     # measurement. It is kept in kriging.py for terrain that does have a range,
     # and is not used here.
     #
-    # A fixed radius is not the answer either, because it means different things
-    # at different densities. At 3 points per square metre `max_points` binds
-    # long before a 20 m radius does and 5 m and 20 m give identical results; at
-    # 8 points per square metre the same 20 m radius packed the neighbourhood
-    # tightly enough to lose matrix rank, putting 77 to 88% of l0s444's cells
-    # onto the inverse-distance fallback. `radius_for_density` sets it from the
-    # distance at which `max_points` neighbours are actually found.
+    # A fixed radius appeared not to be the answer either, because it means
+    # different things at different densities. At 3 points per square metre
+    # `max_points` binds long before a 20 m radius does and 5 m and 20 m give
+    # identical results; at 8 points per square metre the same 20 m radius
+    # packed the neighbourhood tightly enough to lose matrix rank, putting 77 to
+    # 88% of l0s444's cells onto the inverse-distance fallback.
+    #
+    # That measurement was taken at `max_points` 16, and the cause was the
+    # point count, not the radius. Sixteen neighbours at 8 points per square
+    # metre are all inside 0.79 m whatever the radius is set to -- nearly
+    # coincident, so the covariance matrix loses rank. Sixty-four reach 1.58 m
+    # at the same density, twice the span, and the conditioning improves
+    # accordingly: moving to 64 inside a fixed 20 m took the fallback from
+    # 1.18% of cells to 0.53% on l0s426 and from 0.23% to 0.10% on l0s395. The
+    # radius was never the problem.
+    #
+    # So the neighbourhood is now the source's own: up to 64 points, minimum 1,
+    # inside a fixed 20 m (Estrada-Belli et al. 2025 supplementary,
+    # GLiHT_Methods_Materials section 5.2), which is also what the `baseline`
+    # profile already used. Measured against each tile's archive surface on the
+    # archive's lattice, with classification held constant:
+    #
+    #   l0s426, 1.08 returns per m2   semivariance at one cell 0.14876 -> 0.12997
+    #   (sparse, steep)               against an archive of 0.10984, so 35% above
+    #                                 it to 18%; coverage 86.6% -> 90.9%;
+    #                                 elevation unchanged within 6 mm
+    #   l0s395, 4.47 returns per m2   semivariance 0.00667 -> 0.00668 against an
+    #   (dense, gentle)               archive of 0.00663, i.e. no smoothing where
+    #                                 there was nothing to gain; three of four
+    #                                 slope bands to exactly zero, the fourth
+    #                                 +0.0128 -> +0.0082 m; coverage 99.1% ->
+    #                                 99.6%
+    #
+    # Better on the sparse tile, neutral-to-better on the dense one, so this is
+    # not density-conditional. It costs 7 to 9 times the interpolation -- 2,400
+    # to 4,700 s per tile against 350 to 630 s -- which is a scheduling cost and
+    # not a methodological one.
+    #
+    # NOT YET MEASURED: the densest tiles. l0s444 at 8.18 returns per m2 is
+    # where the rank failure above was found, and 64 points reach only 1.58 m
+    # there. The mechanism says conditioning should improve, and both measured
+    # tiles agree, but 8 points per square metre is an extrapolation until a run
+    # confirms it. `radius_for_density` is kept in place for that case and for
+    # surveys whose density differs from this one.
     #
     # The source's documented 20 m is preserved in NCALM_TERRASCAN and is the
     # ceiling here, so nothing ever searches further than the method specifies.
@@ -356,14 +393,14 @@ class ReplicalmConfig:
     # fold residual and 2.3x the compute. The Deep profile sets it.
     cell_factor: float = 1.0
 
-    search_radius_m: float = None        # None scales it from ground density
-    search_radius_mode: str = "density"  # density | variogram | fixed
+    search_radius_m: float = NCALM_TERRASCAN["kriging_search_radius_m"]
+    search_radius_mode: str = "fixed"    # density | variogram | fixed
     search_radius_factor: float = 4.0    # multiplier on the k-neighbour spacing
     search_radius_floor_m: float = 3.0
     search_radius_ceiling_m: float = NCALM_TERRASCAN["kriging_search_radius_m"]
-    max_points: int = 16                 # the real control on neighbourhood
+    max_points: int = 64                 # the real control on neighbourhood
                                          # size; see the note above
-    min_points: int = 3                  # below this a cell is left as nodata
+    min_points: int = 1                  # below this a cell is left as nodata
     dem_cell_m: float = NCALM_TERRASCAN["dem_cell_m"]
 
     # The one-sided fringe is one search radius wide, because that is how far a
@@ -441,9 +478,10 @@ BASELINE = {
     "remove_outliers": True,    # tile-dependent, see the note above
     "clean_height_m": 0.20,
     "clean_patch_m": 0.75,
-    "search_radius_mode": "density",
+    "search_radius_mode": "fixed",
+    "search_radius_m": 20.0,
     "search_radius_ceiling_m": 20.0,
-    "max_points": 16,
+    "max_points": 64,
     "dem_cell_m": 1.0,
 
     # Two parameters vary by profile rather than being fixed for every run, so
@@ -451,19 +489,24 @@ BASELINE = {
     # same whichever profile runs.
     "profiles": {
         "ncalm":    {"threshold_m": 0.25, "clean_vegetation": True,
-                     "max_points": 16, "min_points": 3},
-        # The replication target uses the source's own neighbourhood: 20 m
-        # radius, up to 64 points, minimum 1 (Estrada-Belli et al. 2025
-        # supplementary; GLiHT_Methods_Materials section 5.2). Replicalm's 16
-        # and 3 were chosen on their own merits and are kept for the other
-        # profiles, but a configuration whose purpose is fidelity should not
+                     "max_points": 64, "min_points": 1},
+        # Every profile now uses the source's own neighbourhood: 20 m radius,
+        # up to 64 points, minimum 1 (Estrada-Belli et al. 2025 supplementary;
+        # GLiHT_Methods_Materials section 5.2). The replication target always
+        # did, because a configuration whose purpose is fidelity should not
         # differ from its target in the size of the neighbourhood it averages.
+        # Replicalm's own 16 and 3 were chosen on their own merits and held for
+        # the other profiles until 2026-10-05, when 64 at a fixed 20 m measured
+        # better on a sparse tile and neutral on a dense one -- see the note at
+        # `search_radius_m`. So this is no longer a parameter that separates
+        # the profiles, and it is left listed per profile because a survey with
+        # a different density may want it to be again.
         "baseline": {"threshold_m": 0.25, "clean_vegetation": False,
                      "max_points": 64, "min_points": 1},
         "clear":    {"threshold_m": 0.25, "clean_vegetation": True,
-                     "max_points": 16, "min_points": 3},
+                     "max_points": 64, "min_points": 1},
         "deep":     {"threshold_m": 0.25, "clean_vegetation": True,
-                     "max_points": 16, "min_points": 3},
+                     "max_points": 64, "min_points": 1},
     },
 }
 
@@ -502,7 +545,7 @@ def verify_baseline(cfg=None, profile=None):
                            % (k, getattr(p, k), BASELINE[k]))
     for k in ("remove_low_noise", "remove_outliers", "clean_height_m",
               "clean_patch_m", "search_radius_mode",
-              "search_radius_ceiling_m"):
+              "search_radius_m", "search_radius_ceiling_m"):
         if getattr(cfg, k) != BASELINE[k]:
             bad.append("%s: %r, baseline %r" % (k, getattr(cfg, k), BASELINE[k]))
     if profile:
