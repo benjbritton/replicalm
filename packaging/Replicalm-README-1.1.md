@@ -22,15 +22,21 @@ opposite ends of a 458-tile survey, correcting it and tightening the elevation
 threshold took flat-ground error from 29.9 cm to **3.1 mm** and cells landing
 within 25 cm of the reference from 17% to 58%.
 
-**The maximum filter window is 32 m, not 70.** Above 32 m the filter's output
-stops changing, so the larger value was costing two and a half times the
-classification time for identical results.
+**The low-vegetation cleanup no longer removes ground for being on a slope.**
+It used to compare each return against the lowest few percent of returns nearby,
+and on a hillside those sit downhill of the point being judged. On synthetic
+bare ground carrying nothing at all it deleted 90% of it at 25 degrees and 97%
+at 40. On a real steep tile it removed **60.8%** of the classified ground where
+the present rule removes 14%, and the surface was still too high, because the
+removal was compensating for the filter error above rather than correcting it.
+The rule now measures against a plane fitted to each neighbourhood, so the
+terrain cancels and only what stands above it is removed.
 
-**It is faster than 1.0 as well as better.** Measured on a tile of 14 million
-ground returns, 1.0 took 6,198 seconds and 1.1 takes 2,513 — **2.5 times
-quicker**. The maximum filter window did it: above 32 m the ground filter's
-output stops changing, so 1.0's 70 m was costing two and a half times the
-classification time for identical results.
+**It is faster than 1.0 as well as better.** Measured end to end on a tile of 14
+million ground returns: 1.0 took 6,198 seconds, this takes 2,513 — **2.5 times
+quicker**. The maximum filter window did it. Above 32 m the ground filter's
+output stops changing, so 1.0's 70 m was buying nothing for two and a half times
+the classification time.
 
 **The source's larger interpolation neighbourhood is selectable, not the
 default** — 64 ground points inside a fixed 20 m, against the standard 16. It
@@ -41,13 +47,30 @@ paying for on every tile.
 
 **The G1 image now works.** In 1.0 the checkbox called a script that was not in
 the installer, so on every machine it quietly did nothing and left the elevation
-model alone. The recipe is now built in.
+model alone. The recipe is now built in, and the four visualizations it blends
+are written alongside it.
 
-**Files and folders.** The window processes any number of files, and folders are
-searched for point clouds recursively.
+**Files and folders.** The window takes any number of files, and folders are
+searched for point clouds recursively, including subfolders.
+
+**The window stays usable while it works, and you can stop it.** In 1.0
+processing ran inside the window's own process, which stopped it repainting:
+Windows added "(Not Responding)" to the title, and that was accurate rather than
+a false alarm. Processing now runs separately, so the window answers throughout
+— and because it is separate it can be stopped. **Cancel** halts the run and
+returns everything to how it was before Run, with your selections still filled
+in. There was no way to offer that in 1.0.
 
 **Four methods became two.** The two that are gone did not produce meaningfully
-different output.
+different output: one was another method on a finer grid, which the resolution
+control does directly, and the other differed only in using the superseded
+cleanup.
+
+**Two labels, and one dialog that is gone.** A box used to interrupt you if
+anything differed from the defaults, to say that the defaults were measured.
+The field it was guarding is now **Processing notes (optional)** and still
+records whatever you type beside the output. **Keep ground points** is now
+**Save ground-filtered point cloud (LAZ)**, which says what it saves.
 
 ---
 
@@ -70,17 +93,24 @@ Start **Replicalm** from the Start Menu.
 
 | field | what it is |
 |---|---|
-| **Input** | the point clouds to process. **Add file(s)…** takes any number of LAS or LAZ files; **Add folder…** takes a folder and finds every point cloud inside it, including in subfolders |
+| **Input** | the point clouds to process. **Add file(s)…** takes any number of LAS or LAZ files; **Add folder…** takes a folder and finds every point cloud inside it, including in subfolders; **Remove** drops whatever is selected in the list. Folders are shown as `[folder]` and the count of clouds found is reported when you add one |
 | **Output folder** | where results are written; it is created if it does not exist |
 | **Method** | **Clear** or **Base**. Leave it on Clear unless you have a reason not to; both are described below |
 | **Resolution** | how much detail the output map carries, in pixels per square metre. Leave it on `auto` unless you have a reason not to |
-| **Interpolation** | how each output cell is estimated from nearby ground points. Leave it on `published` unless you need the run to finish sooner |
+| **Interpolation** | how each output cell is estimated from nearby ground points. Leave it on `standard` unless the survey is sparse |
 | **Ground threshold (m)** | how far a return may stand above the provisional surface and still count as ground. Leave it on `auto` unless a tile comes out wrong |
 | **Also build the G1 image** | produces the relief visualization as well as the elevation model |
-| **Keep ground points** | writes out the ground returns as a point cloud, so the classification can be inspected |
+| **Save ground-filtered point cloud (LAZ)** | writes out the ground returns, so the classification can be inspected or the cleanup re-derived without classifying again. Ticking it enables the selector beside it, which chooses whether to save the ground before or after the low-vegetation cleanup |
+| **Processing notes (optional)** | anything you want recorded beside the output, in your own words |
 
 Press **Run**. The progress bar tracks the whole job across however many files
 were added, and the message pane reports each stage as it finishes.
+
+**Cancel** stops the run. The window returns to how it was before Run, with
+every selection still filled in, so you can change one thing and start again.
+Whatever had already finished stays on disk; a later run over the same file
+replaces it rather than reusing it, so a part-written intermediate cannot be
+mistaken for a finished one.
 
 A full survey tile takes roughly half an hour to two hours depending on its size
 and settings; a smaller area takes minutes. Adding ten tiles takes ten times as
@@ -172,12 +202,16 @@ Raise it if a tile has had real terrain removed — terracing on steep faces,
 flattened platform edges. Lower it if low vegetation is coming through as
 ground. Change it because a tile came out wrong, not as a matter of routine.
 
-### Recording why you changed something
+### Keeping a note of what you did
 
-The **Reason for changing** box records that claim in the settings file beside
-the output, where anyone reading the result later can see both what was changed
-and why. A result produced with altered settings and no stated reason cannot be
-defended afterwards, including by you.
+Every run writes a `_config.json` beside its output listing every setting it
+used, so a result can always be traced back to the configuration that produced
+it, whether or not anyone wrote anything down.
+
+**Processing notes (optional)** adds your own account to that file. It is useful
+when a survey needed something other than the defaults and the reason will not
+be obvious to whoever reads the result later — including you, six months on.
+Nothing requires it and nothing will ask you for it.
 
 ## What you get
 
