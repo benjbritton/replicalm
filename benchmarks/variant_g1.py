@@ -20,7 +20,8 @@ import time
 from dataclasses import replace
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from paths import SRC, TESTS
+from paths import DEM_ROOT, LAS_ROOT, SRC, TESTS
+from reference import PairingError, reference_for
 sys.path.insert(0, SRC)
 
 from replicalm import pipeline
@@ -33,21 +34,32 @@ DEFAULT_TILE = "AMIGACarb_Yuc_South_GLAS_Apr2013_l0s395"
 
 
 def locate(tile):
-    """LAS, archive reference and working directory for a tile stem."""
+    """LAS, archive reference and working directory for a tile stem.
+
+    The reference is resolved on region, sensor and tile id together. It used to
+    be globbed on the tile id alone -- `*l0s441*0p5m*.tif` -- and tile ids repeat
+    across regions, so that was ambiguous for 223 of the 458 corpus tiles and
+    returned whichever the filesystem listed first. Concretely: the Chiapas-1
+    tile l0s422 has no reference of its own, and the old glob matched
+    `OutYuc_NFI_l0s422` instead and would have scored it against a survey from
+    a different part of the peninsula, silently and with a plausible number.
+
+    The working directory still uses the bare id, which is safe because a run
+    names one tile, but it means two same-id tiles from different regions share
+    a directory. Pass REPLICALM_WORK to separate them if that ever matters.
+    """
     import glob as _glob
-    las = _glob.glob(os.path.join(os.environ.get("REPLICALM_LAS_ROOT",
-                                                 r"D:\GLiHT_LAS_orig"),
-                                  "**", tile + ".la[sz]"), recursive=True)
+    las = _glob.glob(os.path.join(LAS_ROOT, "**", tile + ".la[sz]"),
+                     recursive=True)
     if not las:
         raise SystemExit("no LAS found for %s" % tile)
+    try:
+        ref = reference_for(tile, root=DEM_ROOT)
+    except PairingError as exc:
+        raise SystemExit("%s" % exc)
     sid = tile.split("_")[-1]
-    ref = _glob.glob(os.path.join(os.environ.get("REPLICALM_DEM_ROOT",
-                                                 r"D:\_Archive_EdgeFixed"),
-                                  "**", "*%s*0p5m*.tif" % sid), recursive=True)
-    if not ref:
-        raise SystemExit("no 0.5 m archive reference found for %s" % sid)
     base = os.path.join(TESTS, "clear_fulltile", sid)
-    return las[0], ref[0], base
+    return las[0], ref, base
 
 G1_PY = os.environ.get("REPLICALM_G1_PYTHON",
                        r"C:\Users\benja\anaconda3\envs\g1\python.exe")
