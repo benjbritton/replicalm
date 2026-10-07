@@ -200,14 +200,44 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
              "%d ground points, %.2f per m2, search radius %.2f m"
              % (len(z), density, radius), 0.35)
 
-    v = K.fit_variogram(x, y, z, model=cfg.variogram_model,
-                        max_lag=cfg.variogram_fit_lag_m * 2)
-    dem, info = K.krige_grid(x, y, z, g, radius=radius,
-                             max_points=cfg.max_points,
-                             min_points=cfg.min_points, variogram=v,
-                             verbose=False,
-                             chunk_cells=getattr(cfg, "chunk_cells", 1000000))
-    if info["fallback_fraction"] > 0.25:
+    # Coincident XY make every solver's system singular, so the points are
+    # conditioned once here rather than inside whichever engine runs. See
+    # preprocess.dedupe_xy: the kriging path used to carry its own copy, and a
+    # spline tried on the same data failed for the same reason because the fix
+    # was not reachable from outside kriging.
+    from .preprocess import dedupe_xy, describe
+    x, y, z, dedupe_report = dedupe_xy(x, y, z, keep="lowest")
+    note = describe(dedupe_report)
+    if note:
+        progress("interpolate", note)
+
+    engine = getattr(cfg, "interpolator", "kriging")
+    if engine == "spline":
+        from . import spline as S
+        progress("interpolate",
+                 "minimum curvature with tension %.3f, %d neighbours"
+                 % (getattr(cfg, "spline_tension", S.DEFAULT_TENSION),
+                    getattr(cfg, "spline_neighbours", S.DEFAULT_NEIGHBOURS)))
+        dem, info = S.spline_grid(
+            x, y, z, g,
+            tension=getattr(cfg, "spline_tension", S.DEFAULT_TENSION),
+            neighbours=getattr(cfg, "spline_neighbours", S.DEFAULT_NEIGHBOURS),
+            smoothing=getattr(cfg, "spline_smoothing", S.DEFAULT_SMOOTHING),
+            min_points=cfg.min_points, verbose=False,
+            chunk_cells=getattr(cfg, "chunk_cells", 1000000))
+    elif engine == "kriging":
+        v = K.fit_variogram(x, y, z, model=cfg.variogram_model,
+                            max_lag=cfg.variogram_fit_lag_m * 2)
+        dem, info = K.krige_grid(x, y, z, g, radius=radius,
+                                 max_points=cfg.max_points,
+                                 min_points=cfg.min_points, variogram=v,
+                                 verbose=False,
+                                 chunk_cells=getattr(cfg, "chunk_cells",
+                                                     1000000))
+    else:
+        raise PipelineError("unknown interpolator %r; expected 'kriging' or "
+                            "'spline'" % engine)
+    if info.get("fallback_fraction", 0.0) > 0.25:
         progress("interpolate",
                  "%.0f%% of cells fell back to inverse distance: the "
                  "neighbourhood is too tightly packed for the covariance model"

@@ -326,7 +326,29 @@ class ReplicalmConfig:
     # defaults are measurements rather than preferences. They were chosen on
     # South_GLAS_l0s395 and should be re-checked on unfamiliar terrain, which is
     # what `replicalm.calibrate` is for.
-    interpolator: str = "kriging"        # kriging | cloudcompare
+    # WHICH SURFACE ENGINE RUNS
+    #
+    # "kriging" estimates each cell as a weighted average of its neighbours
+    # under second-order stationarity. Where ground returns arrive in clumps
+    # separated by canopy voids the weights concentrate on the nearest clump and
+    # the surface relaxes toward the local mean between them, which on sloped
+    # ground reads as curvilinear grooves. No neighbourhood, nugget or cell size
+    # removes that: the mechanism is in the estimator, not its parameters.
+    #
+    # "spline" is minimum curvature with tension, which has no local mean to
+    # relax toward. Measured on Centro GLAS l0s441, interior cells, identical
+    # accepted ground and grid, against a TerraScan/Surfer reference of 21.7
+    # degrees at the 99th percentile of local slope: kriging 24.1, spline 20.9
+    # at tension 0.03. See `replicalm.spline` for the tension response.
+    #
+    # Tension 0.03 is the operating point. The response flattens below it --
+    # 0.02 measures 21.1 against 0.03's 20.9 -- and 0.03 carries the smallest
+    # local excursions of any surface compared, the reference included, so it is
+    # not over-smoothing to reach that figure.
+    interpolator: str = "spline"         # kriging | spline | cloudcompare
+    spline_tension: float = 0.03         # inverse metres; see replicalm.spline
+    spline_neighbours: int = 48          # observations per local solve
+    spline_smoothing: float = 1e-2       # Tikhonov, as a fraction of the kernel
     variogram_model: str = "spherical"   # spherical | exponential | linear
     variogram_fit_lag_m: float = 5.0     # lag out to which the model is fitted
 
