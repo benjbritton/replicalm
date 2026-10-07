@@ -83,17 +83,18 @@ RESOLUTIONS = [
 # numbers, because the pair moves together -- 64 points only condition well
 # inside a radius wide enough to hold them.
 #
-# 16 is first and is the default, although 64 is the figure the source method
-# specifies and measured slightly better. The margin does not pay for the time:
-# on a tile at 4.2 ground returns per square metre, 64 bought half a point of
-# coverage and a tenth of a percent of texture for nine times the interpolation,
-# and the corpus median density is nearer that tile than the sparse one. On a
-# genuinely sparse survey -- under one return per square metre -- 64 earns it,
-# with 3.8 points more coverage and a visibly closer match to the reference's
-# texture, which is why it stays on the menu.
+# 64 points within 20 m is first and is the default. It is the source method's
+# own figure, and a smaller neighbourhood cuts spurious narrow grooves into
+# every slope: on one tile the 99th percentile of local slope was 32.9 degrees
+# with 16 points against the reference's 22, and 23.9 with 64 inside 20 m.
+#
+# 16 was briefly the default on 2026-10-05, chosen on tile-average measures that
+# cannot see a fault occupying 1% of cells arranged in thin lines. It stays on
+# the menu because it interpolates seven to nine times faster, and the label
+# says what that costs rather than calling it "standard".
 NEIGHBOURHOODS = [
-    ("standard — 16 points, radius from density", "fast"),
-    ("published — 64 points within 20 m, slower", "published"),
+    ("published — 64 points within 20 m", "published"),
+    ("fast — 16 points, quicker but rougher on slopes", "fast"),
 ]
 
 POINT_CLOUD_TYPES = [("Point clouds", "*.las *.laz"), ("All files", "*.*")]

@@ -393,36 +393,50 @@ class ReplicalmConfig:
     # fold residual and 2.3x the compute. The Deep profile sets it.
     cell_factor: float = 1.0
 
-    # WHICH OF THE TWO IS THE DEFAULT, AND WHY IT IS NOT THE SOURCE'S
+    # 64 POINTS INSIDE A FIXED 20 M, WHICH IS THE SOURCE'S OWN FIGURE
     #
-    # 64 points inside a fixed 20 m is the source's figure and it measured
-    # better or neutral on both test tiles, which is why it was made the
-    # default on 2026-10-05. The margin does not pay for the time. On l0s395 at
-    # 4.47 ground returns per square metre it bought half a point of coverage
-    # and a tenth of a percent of cell-scale texture for nine times the
-    # interpolation -- 625 s against 4,727 -- and the corpus median density of
-    # 3.65 is nearer that tile than the sparse one. Under one return per square
-    # metre it earns its time, with 3.8 points more coverage and a visibly
-    # closer match to the reference's texture.
+    # A smaller neighbourhood puts spurious narrow ridges and grooves on slopes.
+    # On Centro GLAS l0s441 the 99th percentile of local slope is 22.9 and 22.0
+    # degrees in the TerraScan/Surfer rasters at 0.33 and 0.50 m, and 32.9
+    # degrees in a Replicalm raster built with 16 points at a density-derived
+    # radius of 3.73 m. Rebuilt from the same classified ground with 64 points
+    # inside 20 m it is 23.9 degrees, and the inverse-distance fallback falls
+    # from 0.65% of cells to 0.12%. In a plain hillshade the difference is a
+    # network of thin dark incisions across every flank, which is what makes the
+    # hillocks read as inverted, and they are gone at 20 m.
     #
-    # So the shipped default is 16 with the radius from density, and 64 inside
-    # 20 m is a choice the operator can make where the survey justifies it. The
-    # `baseline` profile keeps the source's own neighbourhood regardless,
-    # because a configuration whose purpose is fidelity should not differ from
-    # its target in the size of the neighbourhood it averages.
+    # The defect is NOT the vegetation cleanup: with the cleanup off the 99th
+    # percentile is 33.2 degrees, marginally worse. It is not the G1 blend
+    # either, because a plain hillshade shows it. It is the neighbourhood.
     #
-    # These four move together and are locked per profile rather than globally
-    # for that reason: 64 points inside a radius derived for 16 would be packed
-    # tightly enough to lose matrix rank, and 16 inside a fixed 20 m was
-    # measured doing exactly that on dense data.
-    search_radius_m: float = None        # None scales it from ground density
-    search_radius_mode: str = "density"  # density | variogram | fixed
+    # HOW THIS WAS NEARLY MISSED, which is the part worth keeping
+    #
+    # On 2026-10-05 the default was set to 16 points at a density-derived radius
+    # on the grounds that 64 inside 20 m "bought half a point of coverage and a
+    # tenth of a percent of texture for nine times the interpolation". Those
+    # measures -- median displacement by slope band, cell-scale semivariance,
+    # share of cells within 0.25 m, coverage -- all average over a whole tile. A
+    # fault occupying about 1% of cells and arranged in thin lines moves none of
+    # them appreciably, and their silence was read as absence. It was visible in
+    # the imagery throughout.
+    #
+    # Evaluate a candidate neighbourhood on a tail statistic as well as a
+    # central one. The 99th percentile of local slope against the reference's is
+    # the cheapest one that sees this.
+    #
+    # These four values move together and are locked per profile for that
+    # reason: 64 points inside a radius derived for 16 would be packed tightly
+    # enough to lose matrix rank, and 16 inside a fixed 20 m was measured doing
+    # exactly that on dense data. 16 with a density-derived radius remains
+    # selectable for speed, and costs the slopes.
+    search_radius_m: float = NCALM_TERRASCAN["kriging_search_radius_m"]
+    search_radius_mode: str = "fixed"    # density | variogram | fixed
     search_radius_factor: float = 4.0    # multiplier on the k-neighbour spacing
     search_radius_floor_m: float = 3.0
     search_radius_ceiling_m: float = NCALM_TERRASCAN["kriging_search_radius_m"]
-    max_points: int = 16                 # the real control on neighbourhood
+    max_points: int = 64                 # the real control on neighbourhood
                                          # size; see the note above
-    min_points: int = 3                  # below this a cell is left as nodata
+    min_points: int = 1                  # below this a cell is left as nodata
     dem_cell_m: float = NCALM_TERRASCAN["dem_cell_m"]
 
     # The one-sided fringe is one search radius wide, because that is how far a
@@ -512,29 +526,26 @@ BASELINE = {
     # did, on a default run, when the shipped default and this lock disagreed.
     "profiles": {
         "ncalm":    {"threshold_m": 0.25, "clean_vegetation": True,
-                     "max_points": 16, "min_points": 3,
-                     "search_radius_mode": "density", "search_radius_m": None},
-        # The replication target uses the source's own neighbourhood: 20 m
-        # radius, up to 64 points, minimum 1 (Estrada-Belli et al. 2025
-        # supplementary; GLiHT_Methods_Materials section 5.2), because a
-        # configuration whose purpose is fidelity should not differ from its
-        # target in the size of the neighbourhood it averages.
-        #
-        # The others ship 16 with the radius from density. 64 at a fixed 20 m
-        # measured better on a sparse tile and neutral on a dense one, and was
-        # briefly the default for every profile on 2026-10-04 -- but at nine
-        # times the interpolation for half a point of coverage on a tile near
-        # the corpus median density, which is not a trade worth making by
-        # default. See the note at `search_radius_m`. It stays selectable.
+                     "max_points": 64, "min_points": 1,
+                     "search_radius_mode": "fixed", "search_radius_m": 20.0},
+        # Every profile uses the source's own neighbourhood: 20 m radius, up to
+        # 64 points, minimum 1 (Estrada-Belli et al. 2025 supplementary;
+        # GLiHT_Methods_Materials section 5.2). The replication target always
+        # did, because a configuration whose purpose is fidelity should not
+        # differ from its target in the size of the neighbourhood it averages.
+        # The others were briefly set to 16 at a density-derived radius on
+        # 2026-10-05 and put back the next day, when a smaller neighbourhood was
+        # found to cut spurious narrow grooves into every slope -- see the note
+        # at `search_radius_m`, and note what it cost to find.
         "baseline": {"threshold_m": 0.25, "clean_vegetation": False,
                      "max_points": 64, "min_points": 1,
                      "search_radius_mode": "fixed", "search_radius_m": 20.0},
         "clear":    {"threshold_m": 0.25, "clean_vegetation": True,
-                     "max_points": 16, "min_points": 3,
-                     "search_radius_mode": "density", "search_radius_m": None},
+                     "max_points": 64, "min_points": 1,
+                     "search_radius_mode": "fixed", "search_radius_m": 20.0},
         "deep":     {"threshold_m": 0.25, "clean_vegetation": True,
-                     "max_points": 16, "min_points": 3,
-                     "search_radius_mode": "density", "search_radius_m": None},
+                     "max_points": 64, "min_points": 1,
+                     "search_radius_mode": "fixed", "search_radius_m": 20.0},
     },
 }
 
