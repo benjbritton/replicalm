@@ -204,10 +204,26 @@ def _write_float(arr, path, profile, crs):
     return str(path)
 
 
-def _write_rgb(canvas, path, profile, crs):
+def _write_rgb(canvas, path, profile, crs, valid=None):
+    """Write the composite, under the convention that black means no data.
+
+    A G1 value can legitimately land on zero -- deep shadow in the multiple
+    hillshade, a strongly negative openness -- and if it is written as 0,0,0 it
+    becomes indistinguishable from outside the survey. Inside the valid area
+    those pixels are lifted to 1,1,1, which is a change of 1/255 in one grey
+    level and reserves pure black for nodata alone. This is the same rule
+    `mask.enforce` applies to the elevation band.
+    """
     import rasterio
     os.makedirs(os.path.dirname(path), exist_ok=True)
     grey = (np.clip(np.nan_to_num(canvas, nan=0.0), 0, 1) * 255).astype(np.uint8)
+    if valid is not None:
+        v = np.asarray(valid, bool)
+        lifted = int((v & (grey == 0)).sum())
+        grey[v & (grey == 0)] = 1
+        grey[~v] = 0
+        if lifted:
+            print("  G1: lifted %d valid pixels off pure black" % lifted)
     p = dict(profile)
     p.update(dtype="uint8", count=3, compress="lzw", crs=crs, nodata=None)
     with rasterio.open(str(path), "w", **p) as dst:
@@ -245,6 +261,6 @@ def g1(dem_path, out_dir, keep_layers=True, progress=None, stem=None):
 
     written["g1"] = _write_rgb(canvas,
                                os.path.join(g1_dir, "%s_G1.tif" % stem),
-                               profile, crs)
+                               profile, crs, valid=np.isfinite(dem))
     progress("visualize", "G1 written: %s" % os.path.basename(written["g1"]))
     return written

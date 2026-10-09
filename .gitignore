@@ -72,3 +72,9 @@ docs/paper/
 HANDOFF.md
 Replicalm_post_calibrating_v1.docx
 Replicalm_post_specks_v1.docx
+
+# Development test outputs: 5.6 GB of derived rasters, point sets and renders
+# on local disks. Not published data. Everything needed to regenerate them is
+# tracked under experiments/, and experiments/ground_tsr/README.md says how.
+# Listed explicitly because .npy and .png are not otherwise ignored.
+test100526/

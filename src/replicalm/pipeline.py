@@ -271,14 +271,39 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
                          "the saved ground is the classified ground")
 
     dem_path = os.path.join(out_dir, stem + "_DEM.tif")
-    report = finalise.finalise(dem, g, wkt, dem_path, radius_m=radius,
+    # Two different trims, because they answer two different questions. The
+    # erosion depth is the distance a cell can reach for support that exists on
+    # one side only, which is the search radius and is a kriging quantity; the
+    # spline and the global solver have no such radius, so for them the depth
+    # is the support radius itself rather than a number borrowed from an engine
+    # that is not running. The support mask is measured against the data and
+    # applies either way: see config.edge_fix_m for how 4.0 m was arrived at.
+    edge_fix = getattr(cfg, "edge_fix_m", None)
+    support = None
+    if edge_fix:
+        support = finalise.support_mask(x, y, g, edge_fix)
+        progress("finalise", "edge fix: %.1f m from the nearest ground return, "
+                 "%d of %d cells supported"
+                 % (edge_fix, int(support.sum()), support.size))
+    trim_radius = radius if engine == "kriging" else (edge_fix or radius)
+    strip_m = getattr(cfg, "edge_strip_m", None)
+    axis = getattr(cfg, "edge_axis", None) or finalise.infer_transect_axis(
+        g, os.path.basename(las_path))
+    if strip_m:
+        progress("finalise", "edge strip: %.1f m across-track (%s), the "
+                 "reference convention" % (strip_m, axis))
+    report = finalise.finalise(dem, g, wkt, dem_path, radius_m=trim_radius,
                                nodata_in=-9999.0,
-                               erode_factor=cfg.erode_factor, verbose=False)
+                               erode_factor=cfg.erode_factor,
+                               support=support, strip_m=strip_m, axis=axis,
+                               verbose=False)
 
     out = {"dem": dem_path, "ground_las": kept_ground,
            "ground_stage": ground_stage if kept_ground else None,
            "ground_points": int(len(z)), "density": density,
            "search_radius_m": radius, "cell_m": cell_m,
+           "edge_fix_m": edge_fix, "edge_strip_m": strip_m,
+           "edge_axis": axis,
            "fallback_fraction": info["fallback_fraction"],
            # The correlation range is what explains the fallback: when the
            # nearest max_points neighbours all sit inside it, their pairwise
@@ -292,7 +317,8 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
            "locked_baseline": baseline, "seconds": round(time.time() - t0, 1)}
     out.update({k: report[k] for k in
                 ("filled_cells", "holes", "erode_cells", "erode_m",
-                 "cells_after_trim", "filled_fraction")})
+                 "cells_after_trim", "filled_fraction",
+                 "interior_cells_restored")})
     if kept_ground != ground_las and os.path.exists(ground_las):
         os.remove(ground_las)
 

@@ -206,11 +206,32 @@ class ReplicalmConfig:
     # classify.py as a divergence, and the measurement now says the divergence
     # costs nothing to make complete.
     #
-    # `threshold_m` is 0.25, not the source's 3.0, and `cell_m` is 0.5 rather
-    # than 1.0. `cell_m` is the one parameter the source cannot specify, since
-    # TerraScan has no SMRF working grid; left coarser than the output cell it
-    # quantizes steep faces into steps, with terracing of 5.06% at 1 m, 2.44%
-    # at 0.5 m and 0.68% at 0.25 m. Tie it to `dem_cell_m`.
+    # `threshold_m` is 0.25, not the source's 3.0. `cell_m` is 1.0 as of
+    # 2026-10-07, raised from 0.5, and the two measurements behind that
+    # disagree with each other -- both are recorded because the conflict is
+    # not resolved.
+    #
+    # AGAINST 1.0 m, measured earlier: left coarser than the output cell the
+    # working grid quantizes steep faces into steps, with terracing of 5.06%
+    # at 1 m, 2.44% at 0.5 m and 0.68% at 0.25 m.
+    #
+    # FOR 1.0 m, measured on the whole of l0s441, 55.2 million raw returns
+    # classified twice with nothing else changed, scored over 11.9 million
+    # cells against the TerraScan/Surfer reference:
+    #
+    #                 class-2      RMSE     MAE    p99   roughness    nugget
+    #     cell 0.50  17893142    0.1027  0.0459   21.0       1.055  0.001497
+    #     cell 1.00  17702632    0.0789  0.0420   20.5       1.015  0.001402
+    #
+    # RMSE falls 23.1%, MAE 8.3%, nugget 6.4%, and roughness moves from 1.055
+    # to 1.015 against the reference's 1.000, for 1.1% fewer ground returns.
+    # The same direction appeared first on eighteen 40 m windows, so this is a
+    # replication rather than a single result.
+    #
+    # The two are not necessarily contradictory: terracing is a defect of
+    # steep faces and the RMSE is a whole-tile average, so 1.0 m could be
+    # better overall and worse on scarps. That has not been tested. Revert by
+    # setting cell_m back to 0.5 here and in BASELINE.
     #
     # `scalar` is 0.00 and `window_m` is 32, both changed from the values this
     # file carried until 2026-10-04 (1.25 and 70). The three parameters were
@@ -252,11 +273,30 @@ class ReplicalmConfig:
     # rejected.
     reset_classification: bool = True
     passes: list = field(default_factory=lambda: [
-        GroundPass(slope=_slope_from_angle(9.0), threshold_m=0.25, cell_m=0.5,
+        GroundPass(slope=_slope_from_angle(9.0), threshold_m=0.25, cell_m=1.0,
                    scalar=0.0, window_m=32.0, reuse_ground=False,
                    stands_in_for="TerraScan pass 1: 70 m, 88 deg, 9 deg, 3 m; "
                                  "pass 2 dropped, see the note above"),
     ])
+
+    # Which ground classifier runs.
+    #
+    # "smrf" is the locked baseline: the single morphological pass defined in
+    # `passes` above, which is what every published Replicalm figure was built
+    # with and what the installer ships.
+    #
+    # "tsr" is `replicalm.ground_tsr`, which composes a conservative opening,
+    # a permissive curvature test and an adjudication stage between them. It
+    # was built to reproduce an NCALM TerraScan/Surfer ground population from
+    # raw returns and is calibrated against one; see that module's docstring
+    # for the measured basis of every default and for its operational limits.
+    # It is opt-in because the baseline is locked, not because it scores worse.
+    #
+    # `passes` is ignored under "tsr": the routine carries its own stage
+    # parameters so that one object describes one classifier, rather than two
+    # places having to agree.
+    ground_engine: str = "smrf"          # smrf | tsr
+    ground_tsr_overrides: dict = field(default_factory=dict)
 
     # height above ground, step 6
     hag_low_cut_m: float = NCALM_TERRASCAN["hag_low_cut_m"]
@@ -471,6 +511,50 @@ class ReplicalmConfig:
     erode_factor: float = 1.0
     erode_cells: int = 0                 # kept for callers that set it directly
 
+    # How far a cell may sit from the nearest accepted ground return and still
+    # be written. Morphological erosion of the coverage mask cannot express
+    # this: it trims inward from whatever the interpolator chose to fill, so an
+    # engine that extrapolates keeps a fringe no erosion depth reaches, and an
+    # engine that does not loses good ground.
+    #
+    # 4.0 m is measured, not chosen. On Centro GLAS l0s441, distance to the
+    # nearest return was thresholded across 1 to 7 m and scored against the
+    # TerraScan/Surfer extent for the same tile:
+    #
+    #     radius   1.5     2.5     3.0     4.0     5.0     7.0
+    #     IoU      0.9422  0.9737  0.9782  0.9782  0.9749  0.9655
+    #     lost     5.08%   1.54%   0.81%   0.33%   0.15%   0.04%
+    #     fringe   0.77%   1.13%   1.40%   1.86%   2.37%   3.42%
+    #
+    # 3.0 and 4.0 tie on agreement; 4.0 keeps 99.67% of the reference's cells
+    # against 3.0's 99.19%, for 0.46% more fringe. Set to None to skip the
+    # support mask and trim by erosion alone, which is the pre-1.1 behaviour.
+    #
+    # Interior voids are filled before the mask is applied. Ground returns are
+    # sparse under canopy, so a bare distance threshold punches holes through
+    # the middle of good terrain, and a hole inside the survey is not an edge.
+    edge_fix_m: float = 4.0
+
+    # The across-track strip, which is the edge treatment the reference
+    # products themselves use. From the G-LiHT reprocessing work: where
+    # adjacent flight passes overlap and are merged, the ground classification
+    # at the overlap differs from the interior and leaves a seam about 21 m
+    # wide down both sides of every transect. `clean_las_edges.py` removes
+    # STRIP_M = 21.0 m per side; `mask_dem_edges.py` removes 64 px at 0.33 m,
+    # which is the same 21 m.
+    #
+    # This replaces the morphological erosion rather than adding to it, and it
+    # is the less aggressive of the two in the direction that matters: erosion
+    # takes a ring, so it strips the along-track ends where there is no seam,
+    # and it widens every interior void by its own depth. The strip touches
+    # only the first and last run of each line.
+    #
+    # `edge_axis` follows the G-LiHT naming -- _GLAS_ flies north-south so its
+    # seams are left and right, _NFI_ flies east-west so they are top and
+    # bottom. None infers from the name, then from the aspect ratio.
+    edge_strip_m: float = 21.0
+    edge_axis: str = None                # "x" | "y" | None to infer
+
     # the documented figure, kept so the source is never lost even though the
     # default no longer uses it directly
     ncalm_search_radius_m: float = NCALM_TERRASCAN["kriging_search_radius_m"]
@@ -525,13 +609,15 @@ class ReplicalmConfig:
 # steep ground, and all three were wrong.
 
 BASELINE = {
-    "locked": "2026-10-04",
+    "locked": "2026-10-07",
     "algorithm": "smrf",
     "passes": 1,
     "slope": 0.1584,            # tan 9 deg, the source's pass-1 iteration angle
-    "cell_m": 0.5,
+    "cell_m": 1.0,              # raised 2026-10-07; see the note above
     "scalar": 0.0,              # the slope-coupled tolerance, measured off
-    "window_m": 32.0,           # the opening's saturation point at this cell
+    "window_m": 32.0,           # saturated: PDAL's opening stops responding
+                                # above about 8 m on this data, so 8, 32, 100
+                                # and 200 give identical output
     "remove_low_noise": False,  # ELM: inert on this data, 0.00% removed
     "remove_outliers": True,    # tile-dependent, see the note above
     "clean_height_m": 0.20,

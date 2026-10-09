@@ -135,13 +135,141 @@ def write_points(arr, out_path, cfg, srs=None):
     return str(out_path)
 
 
+def _post_ground_stages(cfg, in_path, out_path, srs):
+    """Steps 6 and 7: height above ground, the class filter, the writer.
+
+    Factored out because two classifiers need it and the alternative was a
+    second copy that would drift out of step with this one.
+
+    Returns (stages, hag_from, n_hag) so a caller can retry without the
+    height-above-ground stages when the triangulation refuses.
+    """
+    hag_stages = [
+        {"type": "filters.hag_delaunay"},
+        {"type": "filters.expression",
+         "expression": "HeightAboveGround >= %g && HeightAboveGround <= %g"
+                       % (cfg.hag_low_cut_m, cfg.hag_high_cut_m)},
+    ]
+    lo, hi = cfg.near_ground_band_m
+    hag_stages.append({"type": "filters.assign",
+                       "value": "Classification = %d WHERE "
+                                "HeightAboveGround > %g && "
+                                "HeightAboveGround < %g && Classification != 2"
+                                % (cfg.near_ground_class, lo, hi)})
+    keep = " || ".join("Classification == %d" % c for c in cfg.keep_classes)
+    writer = {"type": "writers.las", "filename": str(out_path),
+              "minor_version": int(str(cfg.las_version).split(".")[1]),
+              "dataformat_id": int(getattr(cfg, "las_point_format", 6)),
+              "compression": ("laszip" if getattr(cfg, "las_compression", True)
+                              else "false"),
+              "forward": getattr(cfg, "las_forward", "scale,offset"),
+              "software_id": "Replicalm"}
+    if srs:
+        writer["a_srs"] = str(srs)
+    else:
+        from .interpolate import source_srs
+        found = source_srs(in_path)
+        if found:
+            writer["a_srs"] = found
+    stages = list(hag_stages)
+    stages.append({"type": "filters.expression", "expression": keep})
+    stages.append(writer)
+    return stages, 0, len(hag_stages)
+
+
+def _classify_tile_tsr(in_path, out_path, cfg, verbose=True, srs=None):
+    """classify_tile for `ground_engine = "tsr"`.
+
+    The routine is numpy, not a PDAL stage, so the pipeline runs in two parts
+    with the classification between them. Steps 6 and 7 are the same stages
+    the baseline path uses, including the retry when the ground surface cannot
+    be triangulated, so an operator switching engines does not also silently
+    switch the output format or the near-ground band.
+    """
+    import json as _json
+    from . import ground_tsr as TSR
+
+    pdal = _pdal()
+    pre = [las_reader(in_path, srs=srs)]
+    if cfg.reset_classification:
+        pre.append({"type": "filters.assign",
+                    "value": "Classification = 0"})
+    pl = pdal.Pipeline(_json.dumps({"pipeline": pre}))
+    pl.execute()
+    arr = pl.arrays[0]
+    if len(arr) < 32:
+        raise ClassifyError("only %d returns in %s" % (len(arr), in_path))
+
+    base = TSR.GroundTSRParams()
+    over = dict(getattr(cfg, "ground_tsr_overrides", {}) or {})
+    unknown = [k for k in over if k not in base.__dataclass_fields__]
+    if unknown:
+        raise ClassifyError("ground_tsr_overrides has no such setting: %s"
+                            % ", ".join(sorted(unknown)))
+    params = TSR.GroundTSRParams(**{k: over.get(k, getattr(base, k))
+                                    for k in base.__dataclass_fields__})
+    mask, rep = TSR.classify_ground(arr["X"].astype("f8"),
+                                    arr["Y"].astype("f8"),
+                                    arr["Z"].astype("f8"),
+                                    params=params, verbose=verbose)
+    arr["Classification"] = np.where(mask, 2, 1).astype(arr[
+        "Classification"].dtype)
+
+    post, hag_from, n_hag = _post_ground_stages(cfg, in_path, out_path, srs)
+    try:
+        p2 = pdal.Pipeline(_json.dumps({"pipeline": post}), arrays=[arr])
+        kept = p2.execute()
+        hag_ran = True
+    except Exception as exc:
+        if not _is_triangulation_failure(exc):
+            raise
+        if verbose:
+            print("  height above ground could not be computed (%s); "
+                  "classifying without it" % str(exc).strip().splitlines()[0])
+        without = post[hag_from + n_hag:]
+        p2 = pdal.Pipeline(_json.dumps({"pipeline": without}), arrays=[arr])
+        kept = p2.execute()
+        hag_ran = False
+
+    out2 = p2.arrays[0] if p2.arrays else np.zeros(0)
+    cls = out2["Classification"] if len(out2) else np.zeros(0, "u1")
+    out = {"input": str(in_path), "output": str(out_path),
+           "points_out": int(kept),
+           "ground": int((cls == 2).sum()),
+           "near_ground": int((cls == cfg.near_ground_class).sum()),
+           "height_above_ground": hag_ran,
+           "ground_engine": "tsr", "ground_tsr": rep}
+    if verbose:
+        print("  %-38s %8d kept  %8d ground  %7d class-%d"
+              % (os.path.basename(str(in_path)), out["points_out"],
+                 out["ground"], out["near_ground"], cfg.near_ground_class))
+    if not hag_ran:
+        out["warning"] = (
+            "the ground surface could not be triangulated, so height above "
+            "ground was not computed: this tile has no class %d near-ground "
+            "band and no cut on absurd elevations. The ground classification "
+            "and the DEM built from it are unaffected."
+            % cfg.near_ground_class)
+    if out["ground"] < cfg.min_ground_points:
+        out["warning"] = ("only %d ground points; too few to rasterise "
+                          "honestly" % out["ground"])
+    return out
+
+
 def classify_tile(in_path, out_path, cfg, verbose=True, srs=None):
     """Run steps 3 to 7 on one tile. Returns a dict of counts for the log.
 
     The counts matter as much as the output: a tile whose ground fraction is far
     from its neighbours' is the signature of a classification that has gone
     wrong, and that is visible here before anything is interpolated.
+
+    `cfg.ground_engine` selects the classifier. The default "smrf" path below
+    is the locked baseline and is left exactly as it was; "tsr" branches to
+    `_classify_tile_tsr`.
     """
+    if getattr(cfg, "ground_engine", "smrf") == "tsr":
+        return _classify_tile_tsr(in_path, out_path, cfg, verbose=verbose,
+                                  srs=srs)
     pdal = _pdal()
     stages = [las_reader(in_path, srs=srs)]
 

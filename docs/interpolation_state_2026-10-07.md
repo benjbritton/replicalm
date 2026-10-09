@@ -131,6 +131,81 @@ texture. The objective cannot tell the two apart, which is why it nominated a
 surface with 2.87 m excursions. Any adaptive scheme needs the guards inside the
 objective, not applied afterwards.
 
+## Global engines, and the rejection of tension
+
+Commit `a304e8f`, *"feat(surfer_spline): implement global biharmonic solver with
+outer buffer domain; resolve corrugation artifacts"*, added two engines that
+abandon the local-neighbourhood paradigm entirely.
+
+`terrascan_tin.py` — Delaunay plus Clough-Tocher. Measured on the benchmark
+window: p95 29.6, p99 46.4, max 70.4 deg against the archive's 18.5 / 22.8 /
+32.1, RMSE 0.229 m, directional anisotropy 0.278 against 0.077. The surface is a
+visible mosaic of triangular facets. The corrugation is gone, but faceting
+replaces it and is worse.
+
+`surfer_spline.py` — global biharmonic minimum curvature, after Briggs (1974),
+assembled over whatever extent the supplied points occupy with the requested
+window cut out afterwards. That buffer matters: a solve run on exactly the
+requested extent discarded 12,562 of 17,860 returns and let the free-plate
+boundary govern the output edge. With it, all 17,860 are used.
+
+This is the baseline. On the benchmark window:
+
+| | min | max | mean | std | p95 | p99 | max | RMSE | MAE | anisotropy |
+|---|---|---|---|---|---|---|---|---|---|---|
+| archive | 97.23 | 101.78 | 99.58 | 0.960 | 18.5 | 22.8 | 32.1 | — | — | 0.077 |
+| surfer_spline | 97.21 | 101.77 | 99.59 | 0.957 | 20.0 | 27.7 | 52.6 | 0.140 | 0.078 | 0.073 |
+
+Range matches to 2 cm at both ends, standard deviation to 0.003 m, and the
+**directional anisotropy matches the archive** — 0.073 against 0.077, where the
+local tensioned spline reads 0.182 on the same window. No lineation is visible.
+
+### Tension regularization: tested and rejected
+
+A gradient penalty was added to the functional, giving
+`laplacian^2 z - t^2 laplacian z = 0` after Smith and Wessel (1990), discretised
+as a five-point Laplacian folded into the thirteen-point stencil and scaled to
+its diagonal. Tested across t in [0.001, 5.0]:
+
+| t | 1/m | p95 | p99 | max | RMSE | MAE | hollow p99.9 | anisotropy |
+|---|---|---|---|---|---|---|---|---|
+| 0.0 | — | 20.0 | 27.7 | 52.6 | 0.140 | 0.078 | 0.360 | 0.073 |
+| 0.001 | 0.17 | 19.9 | 27.6 | 52.6 | 0.140 | 0.078 | 0.358 | 0.074 |
+| 0.01 | 0.54 | 19.7 | 27.1 | 52.5 | 0.140 | 0.080 | 0.349 | 0.083 |
+| 0.05 | 1.21 | 19.1 | 25.9 | 52.2 | 0.145 | 0.086 | 0.329 | 0.073 |
+| 0.2 | 2.42 | 18.4 | 24.7 | 51.7 | 0.153 | 0.093 | 0.311 | 0.043 |
+| 0.5 | 3.83 | 18.0 | 24.0 | 51.2 | 0.157 | 0.097 | 0.317 | 0.034 |
+| 1.0 | 5.42 | 17.7 | 23.5 | 50.9 | 0.160 | 0.100 | 0.314 | 0.033 |
+| 5.0 | 12.11 | 17.4 | 23.0 | 50.5 | 0.164 | 0.104 | 0.317 | 0.033 |
+| archive | — | 18.5 | 22.8 | 32.1 | — | — | 0.284 | 0.077 |
+
+**Rejected.** Three measurements decide it:
+
+- **It does not touch the slope spikes.** Maximum slope runs 52.6 to 50.5 deg
+  across a five-thousand-fold range of t, against the archive's 32.1. Tension
+  acts only on free cells; cells holding observations are fixed exactly by
+  identity rows, so where two adjacent constrained cells disagree no operator
+  term can soften the step between them. The spikes belong to the observation
+  constraints, not to the surface model.
+- **It flattens real terrain to get the percentile down.** RMSE climbs
+  monotonically from 0.140 to 0.164 m and MAE from 0.078 to 0.104 while p99 only
+  asymptotes near 23.0. Contours wash out into featureless depressions.
+- **It overshoots the benchmark's own texture.** Anisotropy falls to 0.033 by
+  t = 0.5, well below the archive's 0.077, so the surface becomes directionally
+  smoother than the thing it is being matched to.
+
+The operator modifications were removed; `surfer_spline.py` is the clean
+un-regularised solver, verified after restoration to reproduce the baseline
+figures above exactly. Contact sheet of all eight variants against the
+benchmark: `test100526\tension_options_contact_sheet.png`, 300 dpi.
+
+**Direction for any further work on the remaining gap.** Post-hoc surface
+smoothing is closed as a path. What is left sits upstream: the conditioning of
+the point set, and how observations are imposed. The exact identity constraint
+is the specific suspect — it forces the surface through every cell mean with no
+allowance for ranging error, which is what manufactures the 52 deg steps that no
+amount of tension could remove.
+
 ## Open items unrelated to the above
 
 - PDAL at 3.2.3; raise to 3.4.x and rebuild the installer. The 3.4.5
