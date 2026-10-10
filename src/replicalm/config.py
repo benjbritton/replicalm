@@ -385,7 +385,24 @@ class ReplicalmConfig:
     # 0.02 measures 21.1 against 0.03's 20.9 -- and 0.03 carries the smallest
     # local excursions of any surface compared, the reference included, so it is
     # not over-smoothing to reach that figure.
-    interpolator: str = "spline"         # kriging | spline | cloudcompare
+    # "biharmonic" is the production engine as of 2026-10-10.
+    #
+    # The local spline that held this slot approximates: a smoothing term of
+    # 1e-2 over 48 neighbours lets the surface sit off the observations, and
+    # measured against the delivered archive on Centro GLAS l0s454 it retained
+    # 0.505 of the reference's coherent detail below 1 m and 0.607 at 1.5 m.
+    # The global minimum-curvature solve retains 0.914 and 0.972 on the same
+    # tile, halves the error inside the boundary -- 0.0964 m to 0.0513 m at a
+    # 25 m setback -- and runs in a third of the time.
+    #
+    # It is the Surfer half of the reference chain and it had been in the tree
+    # since a304e8f without being reachable from here, so every release before
+    # 1.4.0 shipped the local spline while the measurements quoted against the
+    # archive came from this one.
+    interpolator: str = "biharmonic"     # kriging | spline | biharmonic
+    biharmonic_core_m: float = 150.0     # solved domain, declared in
+    biharmonic_buffer_m: float = 20.0    # metres so it is resolution
+    biharmonic_pool_sigma_m: float = 0.25  # independent
     spline_tension: float = 0.03         # inverse metres; see replicalm.spline
     spline_neighbours: int = 48          # observations per local solve
     spline_smoothing: float = 1e-2       # Tikhonov, as a fraction of the kernel

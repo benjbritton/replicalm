@@ -74,8 +74,18 @@ def dedupe_xy(x, y, z, keep="lowest", round_to=None):
         order = np.lexsort((-z, ky, kx))
     elif keep == "first":
         order = np.lexsort((np.arange(n_in), ky, kx))
+    elif keep == "mean":
+        # For a set that is already ground, "lowest" is the wrong survivor.
+        # A delivered ground population can hold two returns at one XY that
+        # straddle the surface -- in the NCALM deliveries class 2 sits a
+        # median 16 mm below it and class 8 12 mm above -- and taking the
+        # minimum silently keeps the lower class on every collision. That is
+        # a systematic downward pull on an eighth of the points, not a
+        # tie-break. Averaging coincident returns has no such preference.
+        order = np.lexsort((ky, kx))
     else:
-        raise PreprocessError("keep must be 'lowest', 'highest' or 'first'")
+        raise PreprocessError(
+            "keep must be 'lowest', 'highest', 'first' or 'mean'")
 
     kxs, kys = kx[order], ky[order]
     first = np.ones(n_in, dtype=bool)
@@ -83,6 +93,18 @@ def dedupe_xy(x, y, z, keep="lowest", round_to=None):
         first[1:] = (kxs[1:] != kxs[:-1]) | (kys[1:] != kys[:-1])
 
     sel = order[first]
+    if keep == "mean":
+        starts = np.flatnonzero(first)
+        counts = np.diff(np.append(starts, n_in)).astype(float)
+        zbar = np.add.reduceat(z[order], starts) / counts
+        back = np.argsort(sel)
+        xs, ys, zs_ = x[sel][back], y[sel][back], zbar[back]
+        dropped = n_in - len(sel)
+        return xs, ys, zs_, {
+            "points_in": n_in, "points_out": int(len(sel)),
+            "dropped": int(dropped),
+            "collision_groups": int((counts > 1).sum()),
+            "keep": keep, "round_to": round_to}
     sel.sort()                      # back to input order; solvers need no order
     dropped = n_in - len(sel)
     groups = int(np.count_nonzero(~first))      # points that lost a collision

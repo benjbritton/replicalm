@@ -202,6 +202,46 @@ def support_mask(x, y, grid, radius_m):
     return ndi.binary_fill_holes(near)
 
 
+def return_footprint(x, y, grid, axis=None):
+    """The span between the first and last ground return, row by row.
+
+    This replaces `support_mask`, which thresholded a distance transform at a
+    few metres and so drew the coverage boundary as a union of discs. Where
+    returns thin toward a swath margin that union is literally a row of
+    overlapping circles with outliers as detached islands, which is the
+    scalloped boundary the production renders showed.
+
+    The reference implementation -- mask_dem_edges.py in the G1 reprocessing
+    work -- takes the first and last valid column of each row and strips a
+    fixed distance inward from each. It can do that because Surfer bounded its
+    own output; this interpolator has no distance limit and fills the whole
+    lattice, so the footprint has to come from the returns instead. Taking one
+    span per row reproduces the reference's geometry: a single contiguous run
+    per row, so no islands and no scallops are representable at all.
+
+    `axis` follows the transect convention -- "x" spans each row for a GLAS
+    strip, "y" spans each column for an NFI strip.
+    """
+    col = np.floor((np.asarray(x) - grid.origin_x) / grid.cell).astype(np.int64)
+    row = np.floor((grid.origin_y - np.asarray(y)) / grid.cell).astype(np.int64)
+    ok = ((col >= 0) & (col < grid.width) & (row >= 0) & (row < grid.height))
+    occ = np.zeros((grid.height, grid.width), bool)
+    if not ok.any():
+        return np.ones_like(occ)
+    occ[row[ok], col[ok]] = True
+    ax = axis or infer_transect_axis(grid)
+    span = np.zeros_like(occ)
+    if ax == "x":
+        for r in np.flatnonzero(occ.any(axis=1)):
+            c = np.flatnonzero(occ[r])
+            span[r, c[0]:c[-1] + 1] = True
+    else:
+        for c in np.flatnonzero(occ.any(axis=0)):
+            r = np.flatnonzero(occ[:, c])
+            span[r[0]:r[-1] + 1, c] = True
+    return span
+
+
 def finalise(dem, grid, wkt, path, radius_m, nodata_in=-9999.0,
              erode_factor=1.0, max_fill_m=60.0, smoothing=2, support=None,
              strip_m=None, axis=None, verbose=True):

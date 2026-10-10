@@ -128,7 +128,7 @@ Get-ChildItem $appDir -Recurse -Directory -Filter "__pycache__" -ErrorAction Sil
 Copy-Item (Join-Path $root "config.py") $appDir -Force
 # the installed README is written for someone using the program, not for
 # someone reading the repository
-Copy-Item (Join-Path $here "Replicalm-README-1.1.md") (Join-Path $appDir "README.md") -Force
+Copy-Item (Join-Path $here "Replicalm-README-1.3.md") (Join-Path $appDir "README.md") -Force
 if (Test-Path (Join-Path $root "docs")) {
     Copy-Item (Join-Path $root "docs") (Join-Path $appDir "docs") -Recurse -Force
 }

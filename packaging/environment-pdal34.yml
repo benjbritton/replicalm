@@ -1,0 +1,39 @@
+# The runtime environment with PDAL raised to the 3.4 bindings.
+#
+# Kept beside environment.yml rather than replacing it. environment.yml pins
+# what the locked baseline was measured against -- python-pdal 3.2.3 on pdal
+# 2.6.3 -- and that remains the reference until a rebuilt baseline says
+# otherwise.
+#
+# The move is two packages, not one. There is no PDAL 3.x library: 3.4 is the
+# Python binding version, and conda-forge's python-pdal 3.4.x requires the C++
+# pdal library at 2.7.x, which in turn requires libgdal 3.8.5 or newer. So the
+# GDAL stack moves with it.
+#
+# gdal, libgdal and rasterio are left unpinned here on purpose. rasterio 1.3.x
+# was pinned against libgdal 3.8 and cannot follow pdal 2.7 to libgdal 3.9, so
+# pinning it would make the environment unsolvable. The solver picks a coherent
+# set and the resolved versions are recorded by conda env export after the
+# build, which is the honest record of what shipped.
+#
+# An in-place upgrade of the existing environment was attempted first and
+# failed: that environment carries packages from the defaults channel, and
+# defaults' aws-c-common blocks the whole libgdal 3.8.5-and-newer chain. This
+# file is built clean from conda-forge for that reason.
+name: replicalm34
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - pdal=2.7.*
+  - python-pdal=3.4.*
+  - gdal
+  - numpy=1.26.*
+  - scipy=1.11.*
+  - rasterio
+  - matplotlib-base
+  - tk
+  - pip
+  - pip:
+      - rvt-py==2.2.1

@@ -206,7 +206,11 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     # spline tried on the same data failed for the same reason because the fix
     # was not reachable from outside kriging.
     from .preprocess import dedupe_xy, describe
-    x, y, z, dedupe_report = dedupe_xy(x, y, z, keep="lowest")
+    # "mean", not "lowest": by this point the set is already ground,
+    # and a delivered or classified ground population can hold two
+    # returns at one XY straddling the surface. Taking the minimum
+    # biases every collision downward; averaging has no preference.
+    x, y, z, dedupe_report = dedupe_xy(x, y, z, keep="mean")
     note = describe(dedupe_report)
     if note:
         progress("interpolate", note)
@@ -234,9 +238,31 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
                                  verbose=False,
                                  chunk_cells=getattr(cfg, "chunk_cells",
                                                      1000000))
+    elif engine in ("biharmonic", "surfer"):
+        # The Surfer half of the reference chain is a global minimum-curvature
+        # solve, and this is the engine that reproduces it. It was measured
+        # against the delivered archive at 0.0524 m with a roughness ratio of
+        # 0.939 while the local spline above loses half the coherent detail
+        # below 1 m -- and until now it was not reachable from here at all,
+        # only from analysis scripts, so no released build has ever run it.
+        from . import surfer_algoA as SA
+        progress("interpolate",
+                 "global biharmonic minimum curvature, %.0f m cores with a "
+                 "%.0f m buffer, pooling %.2f m"
+                 % (getattr(cfg, "biharmonic_core_m", SA.DEFAULT_CORE_M),
+                    getattr(cfg, "biharmonic_buffer_m", SA.DEFAULT_BUFFER_M),
+                    getattr(cfg, "biharmonic_pool_sigma_m",
+                            SA.DEFAULT_POOL_SIGMA_M)))
+        dem, info = SA.surfer_grid_blocked(
+            x, y, z, g,
+            core_m=getattr(cfg, "biharmonic_core_m", SA.DEFAULT_CORE_M),
+            buffer_m=getattr(cfg, "biharmonic_buffer_m", SA.DEFAULT_BUFFER_M),
+            pool_sigma_m=getattr(cfg, "biharmonic_pool_sigma_m",
+                                 SA.DEFAULT_POOL_SIGMA_M),
+            verbose=False, progress=progress)
     else:
-        raise PipelineError("unknown interpolator %r; expected 'kriging' or "
-                            "'spline'" % engine)
+        raise PipelineError("unknown interpolator %r; expected 'kriging', "
+                            "'spline' or 'biharmonic'" % engine)
     if info.get("fallback_fraction", 0.0) > 0.25:
         progress("interpolate",
                  "%.0f%% of cells fell back to inverse distance: the "
@@ -279,16 +305,26 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     # that is not running. The support mask is measured against the data and
     # applies either way: see config.edge_fix_m for how 4.0 m was arrived at.
     edge_fix = getattr(cfg, "edge_fix_m", None)
-    support = None
-    if edge_fix:
-        support = finalise.support_mask(x, y, g, edge_fix)
-        progress("finalise", "edge fix: %.1f m from the nearest ground return, "
-                 "%d of %d cells supported"
-                 % (edge_fix, int(support.sum()), support.size))
-    trim_radius = radius if engine == "kriging" else (edge_fix or radius)
     strip_m = getattr(cfg, "edge_strip_m", None)
     axis = getattr(cfg, "edge_axis", None) or finalise.infer_transect_axis(
         g, os.path.basename(las_path))
+
+    # The footprint is one span per row between the first and last ground
+    # return, which is the geometry mask_dem_edges.py produces in the G1
+    # reprocessing work. It replaces support_mask, whose thresholded distance
+    # transform drew the boundary as a union of discs and rendered as a
+    # scalloped margin with detached islands.
+    #
+    # The footprint cannot simply be dropped: this interpolator has no
+    # distance limit and fills the whole lattice, so without it the across-
+    # track strip would leave the entire bounding rectangle less its margins.
+    # Surfer bounded its own output, which is why the reference script needed
+    # nothing of the kind.
+    support = finalise.return_footprint(x, y, g, axis)
+    progress("finalise", "footprint: one span per row between the first and "
+             "last ground return, %d of %d cells"
+             % (int(support.sum()), support.size))
+    trim_radius = radius if engine == "kriging" else (edge_fix or radius)
     if strip_m:
         progress("finalise", "edge strip: %.1f m across-track (%s), the "
                  "reference convention" % (strip_m, axis))

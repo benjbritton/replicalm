@@ -376,3 +376,100 @@ def surfer_grid(x, y, z, grid, knee_deg=DEFAULT_KNEE_DEG, beta=DEFAULT_BETA,
         print("  surfer: %d unknowns, %d nonzeros, %s, %.2f to %.2f m"
               % (n, A.nnz, method, np.nanmin(dem), np.nanmax(dem)))
     return dem, info
+
+
+DEFAULT_CORE_M = 150.0
+DEFAULT_BUFFER_M = 20.0
+DEFAULT_POOL_SIGMA_M = 0.25
+
+
+def surfer_grid_blocked(x, y, z, grid, core_m=DEFAULT_CORE_M,
+                        buffer_m=DEFAULT_BUFFER_M,
+                        pool_sigma_m=DEFAULT_POOL_SIGMA_M, nodata=NODATA,
+                        verbose=True, progress=None, **kw):
+    """`surfer_grid` over a grid too large to solve in one system.
+
+    The global solve couples every cell, so a whole G-LiHT tile is far past
+    what a single sparse factorisation will take: 12.5 million cells at 0.5 m
+    on one of these strips. The domain is therefore solved in square cores
+    with an overlapping buffer and only each core is kept, which is how every
+    measured result from this engine was produced -- the figures quoted
+    against the archive come from 150 m cores with a 20 m buffer and are not
+    transferable to any other blocking.
+
+    Core and buffer are declared in metres rather than cells so the geometry
+    is the same at any resolution. Giving them in cells would shrink the
+    solved domain as the grid is refined and change the surface, which is a
+    different experiment than changing the resolution.
+    """
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    z = np.asarray(z, float)
+    cell = grid.cell
+    core = max(int(round(core_m / cell)), 16)
+    buf = max(int(round(buffer_m / cell)), 4)
+    H, W = grid.height, grid.width
+    out = np.full((H, W), float(nodata))
+
+    nbi = (H + core - 1) // core
+    nbj = (W + core - 1) // core
+    bi = np.clip(np.floor((grid.origin_y - y) / cell).astype(np.int64) // core,
+                 0, nbi - 1)
+    bj = np.clip(np.floor((x - grid.origin_x) / cell).astype(np.int64) // core,
+                 0, nbj - 1)
+    bid = bi * nbj + bj
+    order = np.argsort(bid, kind="stable")
+    xs, ys, zs, bids = x[order], y[order], z[order], bid[order]
+    starts = np.searchsorted(bids, np.arange(nbi * nbj + 1))
+
+    solved = failed = 0
+    total = nbi * nbj
+    for i in range(nbi):
+        for j in range(nbj):
+            r0, c0 = i * core, j * core
+            h = min(core, H - r0)
+            w = min(core, W - c0)
+            sel = []
+            for ii in range(max(0, i - 1), min(nbi, i + 2)):
+                for jj in range(max(0, j - 1), min(nbj, j + 2)):
+                    k = ii * nbj + jj
+                    if starts[k + 1] > starts[k]:
+                        sel.append(np.arange(starts[k], starts[k + 1]))
+            if not sel:
+                continue
+            idx = np.concatenate(sel)
+            ox = grid.origin_x + c0 * cell
+            oy = grid.origin_y - r0 * cell
+            m = ((xs[idx] >= ox - buf * cell)
+                 & (xs[idx] <= ox + (w + buf) * cell)
+                 & (ys[idx] <= oy + buf * cell)
+                 & (ys[idx] >= oy - (h + buf) * cell))
+            if m.sum() < 20:
+                continue
+            k = idx[m]
+            sub = grid.__class__(origin_x=ox, origin_y=oy, cell=cell,
+                                 width=w, height=h)
+            try:
+                zz, _info = surfer_grid(xs[k], ys[k], zs[k], sub,
+                                        pool_sigma_m=pool_sigma_m,
+                                        nodata=nodata, verbose=False, **kw)
+                out[r0:r0 + h, c0:c0 + w] = zz
+                solved += 1
+            except Exception:
+                failed += 1
+        if progress is not None and nbi > 1:
+            progress("interpolate",
+                     "biharmonic block row %d of %d" % (i + 1, nbi),
+                     0.40 + 0.30 * (i + 1) / nbi)
+    if verbose:
+        print("  biharmonic: %d of %d blocks solved, %d failed, cores %.0f m "
+              "with a %.0f m buffer" % (solved, total, failed, core * cell,
+                                        buf * cell))
+    filled = int(np.isfinite(out).sum() - (out == nodata).sum())
+    return out, {"engine": "surfer_algoA_blocked",
+                 "model": "global_biharmonic_slope_weighted",
+                 "points": int(len(z)), "blocks": total, "blocks_solved":
+                 solved, "blocks_failed": failed, "core_m": core * cell,
+                 "buffer_m": buf * cell, "pool_sigma_m": pool_sigma_m,
+                 "cells_filled": filled, "fallback_fraction": 0.0,
+                 "singular_cells": 0, "params": None}
