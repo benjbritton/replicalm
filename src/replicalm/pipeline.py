@@ -320,11 +320,19 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     # track strip would leave the entire bounding rectangle less its margins.
     # Surfer bounded its own output, which is why the reference script needed
     # nothing of the kind.
-    support = finalise.return_footprint(x, y, g, axis)
-    progress("finalise", "footprint: one span per row between the first and "
-             "last ground return, %d of %d cells"
-             % (int(support.sum()), support.size))
-    trim_radius = radius if engine == "kriging" else (edge_fix or radius)
+    if not getattr(cfg, "edge_fix_enabled", True):
+        support = None
+        strip_m = None
+        trim_radius = 0.0
+        progress("finalise", "edge fixing is off: no footprint, no "
+                 "across-track strip and no erosion, so every cell the "
+                 "interpolator produced is kept")
+    else:
+        support = finalise.return_footprint(x, y, g, axis)
+        progress("finalise", "footprint: one span per row between the first "
+                 "and last ground return, %d of %d cells"
+                 % (int(support.sum()), support.size))
+        trim_radius = radius if engine == "kriging" else (edge_fix or radius)
     if strip_m:
         progress("finalise", "edge strip: %.1f m across-track (%s), the "
                  "reference convention" % (strip_m, axis))

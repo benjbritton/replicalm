@@ -267,9 +267,16 @@ def finalise(dem, grid, wkt, path, radius_m, nodata_in=-9999.0,
         ax = axis or infer_transect_axis(grid)
         trimmed = transect_edge_mask(covered, grid.cell, strip_m, ax)
         cells = int(round(float(strip_m) / grid.cell))
-    else:
+    elif radius_m and radius_m > 0:
         cells = erosion_cells(radius_m, grid.cell, erode_factor)
         trimmed = M.erode(covered, cells)
+    else:
+        # Edge fixing off: keep every cell the interpolator produced. The
+        # fringe where support is one-sided is left in deliberately, so the
+        # engine can be judged on all of its active-data area rather than on
+        # whatever a trim chose to leave behind.
+        cells = 0
+        trimmed = covered
     n_eroded = int(trimmed.sum())
     if support is not None:
         trimmed = trimmed & np.asarray(support, bool)

@@ -14,7 +14,7 @@
 ; Overridden by build.ps1 with /DAppVersion. The literal is kept current
 ; so a bare ISCC run cannot quietly stamp a superseded version onto a
 ; new build.
-#define AppVersion   "1.3.0"
+#define AppVersion   "1.5.0"
 #define AppPublisher "Benjamin Jay Britton"
 #define AppURL       "https://github.com/benjbritton/Replicalm"
 #define StageDir     "stage"

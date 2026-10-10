@@ -399,6 +399,15 @@ class ReplicalmConfig:
     # since a304e8f without being reachable from here, so every release before
     # 1.4.0 shipped the local spline while the measurements quoted against the
     # archive came from this one.
+    # Edge fixing is OFF as of 2026-10-10, deliberately and temporarily.
+    #
+    # The trim has three stages -- a per-row coverage footprint, a 21 m
+    # across-track strip and an erosion -- and all three remove cells the
+    # interpolator produced. While the biharmonic is being evaluated that
+    # hides what it does over its full active-data area, which is the thing
+    # under test. Setting this True restores all three; nothing else changes.
+    edge_fix_enabled: bool = False
+
     interpolator: str = "biharmonic"     # kriging | spline | biharmonic
     biharmonic_core_m: float = 150.0     # solved domain, declared in
     biharmonic_buffer_m: float = 20.0    # metres so it is resolution
