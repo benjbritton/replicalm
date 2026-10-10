@@ -297,17 +297,29 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
                          "the saved ground is the classified ground")
 
     dem_path = os.path.join(out_dir, stem + "_DEM.tif")
-    # Two different trims, because they answer two different questions. The
-    # erosion depth is the distance a cell can reach for support that exists on
-    # one side only, which is the search radius and is a kriging quantity; the
-    # spline and the global solver have no such radius, so for them the depth
-    # is the support radius itself rather than a number borrowed from an engine
-    # that is not running. The support mask is measured against the data and
-    # applies either way: see config.edge_fix_m for how 4.0 m was arrived at.
+    # Two numbers, two causes, kept apart on purpose.
+    #
+    # The footprint radius is the interpolator's own reach: a cell holds a
+    # measurement when a ground return lies within it, and beyond that the
+    # surface is extrapolated rather than interpolated. The reference products
+    # make this visible -- Surfer kriged at a 20 m search radius with a
+    # minimum of one point, and the archive's furthest cell is 19.73 m from a
+    # return. So it is `search_radius_m`, not a fitted threshold. Choosing the
+    # radius at the knee of the coverage curve was tried and rejected; see
+    # finalise.auto_support_radius.
+    #
+    # The strip is the flight-pass stitching seam, about 21 m wide, where
+    # overlapping passes were merged with differing ground classification. It
+    # is a property of the acquisition, not of the interpolation, and the
+    # reference applies it in metres rather than cells: measured against the
+    # production DEMs it removes 20.95, 20.75 and 21.00 m per side at 0.33,
+    # 0.5 and 1 m resolution.
     edge_fix = getattr(cfg, "edge_fix_m", None)
     strip_m = getattr(cfg, "edge_strip_m", None)
     axis = getattr(cfg, "edge_axis", None) or finalise.infer_transect_axis(
         g, os.path.basename(las_path))
+    support_radius = (getattr(cfg, "footprint_radius_m", None)
+                      or getattr(cfg, "search_radius_m", None) or radius)
 
     # The footprint is one span per row between the first and last ground
     # return, which is the geometry mask_dem_edges.py produces in the G1
@@ -320,6 +332,7 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     # track strip would leave the entire bounding rectangle less its margins.
     # Surfer bounded its own output, which is why the reference script needed
     # nothing of the kind.
+    footprint_report = None
     if not getattr(cfg, "edge_fix_enabled", True):
         support = None
         strip_m = None
@@ -328,14 +341,47 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
                  "across-track strip and no erosion, so every cell the "
                  "interpolator produced is kept")
     else:
-        support = finalise.return_footprint(x, y, g, axis)
-        progress("finalise", "footprint: one span per row between the first "
-                 "and last ground return, %d of %d cells"
-                 % (int(support.sum()), support.size))
-        trim_radius = radius if engine == "kriging" else (edge_fix or radius)
+        ends_m = getattr(cfg, "edge_strip_ends_m", None)
+        support, voids, footprint_report = finalise.data_footprint(
+            x, y, g, support_radius, axis=axis, strip_m=strip_m,
+            ends_m=ends_m)
+        progress("finalise",
+                 "footprint: within %.1f m of a ground return, closed into "
+                 "%d area(s), %d cells; strip %.1f m across-track and "
+                 "%.1f m at the ends"
+                 % (support_radius, footprint_report["areas"],
+                    footprint_report["cells"], strip_m or 0.0,
+                    ends_m or 0.0))
+        # Voids inside the survey get a continuous surface, not a sentinel
+        # elevation: a cell written as 1 would sit a hundred metres below its
+        # neighbours and every derived layer would see a cliff, with the
+        # artifact spreading about five metres past the hole. Where they are
+        # is recorded instead of being encoded in the elevation.
+        have_value = np.isfinite(dem) & (dem != -9999.0)
+        dem, filled = finalise.fill_voids(dem, have_value, support)
+        if filled.any():
+            progress("finalise", "%d cell(s) inside the survey carried no "
+                     "measurement and were filled; recorded in the report"
+                     % int(filled.sum()))
+            footprint_report["voids_filled"] = int(filled.sum())
+        # the strip is already applied inside data_footprint
+        strip_m = None
+        trim_radius = 0.0
     if strip_m:
         progress("finalise", "edge strip: %.1f m across-track (%s), the "
                  "reference convention" % (strip_m, axis))
+    if footprint_report is not None:
+        try:
+            vec = finalise.write_footprint_vectors(
+                support, g, wkt,
+                os.path.join(out_dir, stem + "_footprint.geojson"),
+                voids=(filled if 'filled' in dir() else None))
+            footprint_report["vectors"] = vec
+            progress("finalise", "footprint written as %d polygon(s): %s"
+                     % (vec["features"], os.path.basename(vec["path"])))
+        except Exception as exc:
+            progress("finalise", "could not write the footprint vectors (%s)"
+                     % str(exc)[:60])
     report = finalise.finalise(dem, g, wkt, dem_path, radius_m=trim_radius,
                                nodata_in=-9999.0,
                                erode_factor=cfg.erode_factor,
@@ -346,8 +392,12 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
            "ground_stage": ground_stage if kept_ground else None,
            "ground_points": int(len(z)), "density": density,
            "search_radius_m": radius, "cell_m": cell_m,
-           "edge_fix_m": edge_fix, "edge_strip_m": strip_m,
-           "edge_axis": axis,
+           "edge_fix_m": edge_fix,
+           "edge_strip_m": (float(getattr(cfg, "edge_strip_m", 0.0) or 0.0)
+                            if footprint_report else None),
+           "edge_axis": axis, "footprint": footprint_report,
+           "footprint_radius_m": (float(support_radius)
+                                  if footprint_report else None),
            "fallback_fraction": info["fallback_fraction"],
            # The correlation range is what explains the fallback: when the
            # nearest max_points neighbours all sit inside it, their pairwise
@@ -370,6 +420,25 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
         progress("visualize", "building the G1 composite", 0.85)
         out["g1"] = visualize(dem_path, out_dir,
                               progress=progress)
+    # The sidecar was written from the configuration before processing, so
+    # it carried the settings asked for and not the values resolved at run
+    # time -- a footprint radius of None where 20.0 m was used, an axis of
+    # None where "x" was inferred. The run's own account is merged in here,
+    # which is the point of keeping a sidecar beside the output at all.
+    try:
+        import json as _json
+        cfg_path = os.path.join(out_dir, stem + "_config.json")
+        with open(cfg_path) as _fh:
+            _side = _json.load(_fh)
+        _side["run"] = {k: v for k, v in out.items()
+                        if isinstance(v, (str, int, float, bool, list, dict))
+                        or v is None}
+        with open(cfg_path, "w") as _fh:
+            _json.dump(_side, _fh, indent=2, default=str)
+    except Exception as exc:
+        progress("done", "could not record the run in the sidecar (%s)"
+                 % str(exc)[:60])
+
     progress("done", "finished in %.0f s" % (time.time() - t0), 1.0)
     return out
 

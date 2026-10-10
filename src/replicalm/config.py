@@ -399,14 +399,32 @@ class ReplicalmConfig:
     # since a304e8f without being reachable from here, so every release before
     # 1.4.0 shipped the local spline while the measurements quoted against the
     # archive came from this one.
-    # Edge fixing is OFF as of 2026-10-10, deliberately and temporarily.
+    # Edge fixing, back ON as of 2026-10-10 with the method corrected.
     #
-    # The trim has three stages -- a per-row coverage footprint, a 21 m
-    # across-track strip and an erosion -- and all three remove cells the
-    # interpolator produced. While the biharmonic is being evaluated that
-    # hides what it does over its full active-data area, which is the thing
-    # under test. Setting this True restores all three; nothing else changes.
-    edge_fix_enabled: bool = False
+    # Two stages now, with separate causes. The footprint keeps cells within
+    # the interpolator's reach of a ground return -- `search_radius_m`, since
+    # a cell beyond it was extrapolated rather than interpolated -- closes
+    # each area into a polygon with no interior rings, and fills any void
+    # inside the survey with a continuous surface rather than a sentinel.
+    # The across-track strip then removes the flight-pass stitching seam.
+    #
+    # It replaces a 4 m disc union that drew the boundary as overlapping
+    # circles with detached islands, and a blocked-solver artefact that cut
+    # sawtooth teeth at 150 m. Measured on Centro GLAS l0s454: footprint
+    # +0.5% of the archive's area, raggedness 1.91 against 1.89, one polygon.
+    edge_fix_enabled: bool = True
+
+    # Overrides the footprint radius. None means use `search_radius_m`, which
+    # is what the reference's own footprint corresponds to.
+    footprint_radius_m: float = None
+
+    # The along-track ends, trimmed as well as the sides. The sides carry the
+    # flight-pass stitching seam; the ends carry the end-of-pass taper, where
+    # the scan narrows and the solver has support on one side only. The
+    # reference treats both at the same width -- the archive is inset exactly
+    # 42 rows, 21.0 m, at north and south as well as east and west. Set to 0
+    # to leave the ends alone.
+    edge_strip_ends_m: float = 21.0
 
     interpolator: str = "biharmonic"     # kriging | spline | biharmonic
     biharmonic_core_m: float = 150.0     # solved domain, declared in

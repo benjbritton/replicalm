@@ -134,7 +134,8 @@ def infer_transect_axis(grid, name=None):
     return "x" if grid.height >= grid.width else "y"
 
 
-def transect_edge_mask(valid, cell_m, strip_m, axis="x"):
+def transect_edge_mask(valid, cell_m, strip_m, axis="x",
+                       protect_lo=False, protect_hi=False):
     """Drop `strip_m` inward from the outermost data in each row or column.
 
     This is the edge treatment the reference products use, from the G-LiHT
@@ -162,14 +163,29 @@ def transect_edge_mask(valid, cell_m, strip_m, axis="x"):
     if axis == "y":
         v = v.T
         out = out.T
+    # `protect_lo` and `protect_hi` say that the lattice's own border is a
+    # clip rather than the end of the survey, because the point cloud carries
+    # on past it. Stripping there would take good data along a perfectly
+    # straight line for a seam that is not present -- on Centro GLAS l0s454,
+    # coverage reached the west border on 36.6 percent of rows and the strip
+    # cut a 260 m vertical face out of it.
+    #
+    # They default to False, and that matters: when the grid is derived from
+    # the cloud, the data touches the frame on every side by construction, and
+    # protecting it unconditionally would disable the strip entirely. Only a
+    # caller that knows points exist beyond the border should set them.
+    last = v.shape[1] - 1
     lines = np.flatnonzero(v.any(axis=1))
     for r in lines:
         cols = np.flatnonzero(v[r])
         lo, hi = int(cols[0]), int(cols[-1])
-        l_end = min(lo + strip, hi + 1)
-        out[r, lo:l_end] = False
-        r_start = max(hi - strip + 1, l_end)
-        out[r, r_start:hi + 1] = False
+        l_end = lo
+        if not (protect_lo and lo == 0):
+            l_end = min(lo + strip, hi + 1)
+            out[r, lo:l_end] = False
+        if not (protect_hi and hi == last):
+            r_start = max(hi - strip + 1, l_end)
+            out[r, r_start:hi + 1] = False
     return out.T if axis == "y" else out
 
 
@@ -200,6 +216,157 @@ def support_mask(x, y, grid, radius_m):
     near = ndi.binary_closing(dist <= float(radius_m),
                               structure=np.ones((5, 5)))
     return ndi.binary_fill_holes(near)
+
+
+def _distance_to_data(x, y, grid):
+    """Metres from each cell to the nearest return. Shared by the two below."""
+    from scipy import ndimage as ndi
+
+    col = np.floor((np.asarray(x) - grid.origin_x) / grid.cell).astype(np.int64)
+    row = np.floor((grid.origin_y - np.asarray(y)) / grid.cell).astype(np.int64)
+    ok = ((col >= 0) & (col < grid.width) & (row >= 0) & (row < grid.height))
+    occ = np.zeros((grid.height, grid.width), bool)
+    if not ok.any():
+        return None
+    occ[row[ok], col[ok]] = True
+    return ndi.distance_transform_edt(~occ, sampling=grid.cell)
+
+
+def auto_support_radius(x, y, grid, lo_m=1.0, hi_m=60.0, step_m=1.0,
+                        verbose=False):
+    """How far from a return a cell may sit and still be measured, per tile.
+
+    A fixed radius cannot be right for every survey: it has to bridge the
+    gaps between ground returns, and under closed canopy those are far wider
+    than the mean spacing. On the calibration tile the mean ground spacing is
+    0.43 m and the radius that reproduced the reference footprint was 20 m,
+    forty-six times larger, because what it is really bridging is canopy
+    occlusion rather than sampling interval.
+
+    MEASURED AND REJECTED. The knee of the coverage-versus-radius curve was
+    the obvious automatic rule and it does not reproduce the reference: on
+    Centro GLAS l0s454 it chose 7.0 m, giving a footprint 7.4 percent short
+    of the archive's and broken into four pieces. It is also sensitive to the
+    range searched, which makes it a parameter wearing a disguise.
+
+    Use `search_radius_m` instead. The reference footprint is not a property
+    of the gap structure at all -- it is the interpolator's own reach. Surfer
+    ran kriging at a 20 m search radius with a minimum of one point, so a
+    cell received a value exactly when a return lay within 20 m of it, and
+    the archive's maximum distance to a ground return is 19.73 m. A cell
+    beyond the search radius was never interpolated; it was extrapolated.
+
+    Kept because the negative result is worth having in one place.
+    """
+    dist = _distance_to_data(x, y, grid)
+    if dist is None:
+        return float(hi_m)
+    radii = np.arange(lo_m, hi_m + step_m, step_m)
+    area = np.array([float((dist <= r).sum()) for r in radii])
+    if area[-1] <= area[0]:
+        return float(lo_m)
+    rn = (radii - radii[0]) / max(radii[-1] - radii[0], 1e-9)
+    an = (area - area[0]) / max(area[-1] - area[0], 1e-9)
+    # distance from each point to the straight line between the two ends
+    knee = int(np.argmax(np.abs(an - rn)))
+    r = float(radii[knee])
+    if verbose:
+        print("  support radius %.1f m chosen at the knee of the coverage "
+              "curve (%.1f to %.1f m tested)" % (r, lo_m, hi_m))
+    return r
+
+
+def data_footprint(x, y, grid, radius_m, axis=None, strip_m=None,
+                   ends_m=None):
+    """The active area: near a return, closed, optionally stripped.
+
+    Returns (mask, voids, report). `voids` marks cells the closing added --
+    inside the survey but carrying no measurement -- which the caller fills
+    and records rather than leaving as holes.
+
+    Closing runs per connected area, so a detached island becomes its own
+    closed polygon rather than being bridged to the main body.
+    """
+    from scipy import ndimage as ndi
+
+    dist = _distance_to_data(x, y, grid)
+    if dist is None:
+        m = np.ones((grid.height, grid.width), bool)
+        return m, np.zeros_like(m), {"radius_m": radius_m, "areas": 0}
+    near = dist <= float(radius_m)
+    lab, n = ndi.label(near)
+    closed = np.zeros_like(near)
+    for k in range(1, n + 1):
+        closed |= ndi.binary_fill_holes(lab == k)
+    voids = closed & ~near
+    # Does the cloud carry on past the lattice? If it does, that border is a
+    # clip and not a survey edge; if the grid was sized to the cloud, it is
+    # the edge and must be stripped like any other.
+    w = float(grid.origin_x)
+    e = w + grid.width * grid.cell
+    nth = float(grid.origin_y)
+    sth = nth - grid.height * grid.cell
+    past = {"w": float(np.min(x)) < w - 0.5 * grid.cell,
+            "e": float(np.max(x)) > e + 0.5 * grid.cell,
+            "n": float(np.max(y)) > nth + 0.5 * grid.cell,
+            "s": float(np.min(y)) < sth - 0.5 * grid.cell}
+    if strip_m:
+        ax = axis or infer_transect_axis(grid)
+        lo_key, hi_key = ("w", "e") if ax == "x" else ("n", "s")
+        closed = transect_edge_mask(closed, grid.cell, strip_m, ax,
+                                    protect_lo=past[lo_key],
+                                    protect_hi=past[hi_key])
+        # The ends as well as the sides. The sides carry the flight-pass
+        # stitching seam; the ends carry the end-of-pass taper, where the
+        # scan narrows and the solver has support on one side only. Two
+        # different defects, and the reference treats both: measured on
+        # Centro GLAS l0s454 the archive is inset exactly 42 rows, 21.0 m,
+        # at the north and south ends as well as east and west.
+        if ends_m:
+            other = "y" if ax == "x" else "x"
+            lo2, hi2 = ("n", "s") if other == "y" else ("w", "e")
+            closed = transect_edge_mask(closed, grid.cell, ends_m, other,
+                                        protect_lo=past[lo2],
+                                        protect_hi=past[hi2])
+        voids &= closed
+    _l2, n2 = ndi.label(closed)
+    return closed, voids, {"radius_m": float(radius_m),
+                           "strip_m": float(strip_m or 0.0),
+                           "ends_m": float(ends_m or 0.0),
+                           "cloud_past_border": past,
+                           "areas_before_strip": int(n),
+                           "areas": int(n2),
+                           "cells": int(closed.sum()),
+                           "void_cells": int(voids.sum())}
+
+
+def fill_voids(dem, have_value, want):
+    """Give every wanted cell a continuous value. Returns (dem, filled).
+
+    A void inside the survey must not be written as a sentinel elevation. A
+    cell set to 1 sits a hundred metres below its neighbours, so every
+    derived layer sees a cliff and the artifact spreads about five metres
+    past the hole in each direction. The surface is kept continuous here and
+    the void is marked in the image and recorded in the vector sidecar
+    instead, which is where "no measurement" belongs.
+    """
+    from scipy import ndimage as ndi
+
+    out = np.array(dem, dtype=float, copy=True)
+    gap = want & ~have_value
+    if not gap.any():
+        return out, gap
+    idx = ndi.distance_transform_edt(~have_value, return_distances=False,
+                                     return_indices=True)
+    out[gap] = out[tuple(i[gap] for i in idx)]
+    # soften the nearest-neighbour patches so the fill carries no facets
+    src = np.where(have_value | gap, out, 0.0)
+    wgt = (have_value | gap).astype(float)
+    num = ndi.gaussian_filter(src, 1.0)
+    den = ndi.gaussian_filter(wgt, 1.0)
+    smooth = np.where(den > 1e-6, num / np.maximum(den, 1e-6), out)
+    out[gap] = smooth[gap]
+    return out, gap
 
 
 def return_footprint(x, y, grid, axis=None):
@@ -240,6 +407,63 @@ def return_footprint(x, y, grid, axis=None):
             r = np.flatnonzero(occ[:, c])
             span[r[0]:r[-1] + 1, c] = True
     return span
+
+
+def _affine(grid):
+    """rasterio Affine from a Grid. `geotransform` is GDAL's ordering."""
+    from rasterio.transform import Affine
+
+    gt = grid.geotransform
+    return Affine(gt[1], gt[2], gt[0], gt[4], gt[5], gt[3])
+
+
+def write_footprint_vectors(mask, grid, wkt, path, voids=None):
+    """The active area as closed polygons, one per piece, exterior ring only.
+
+    GeoJSON because it needs no driver beyond what rasterio already carries;
+    fiona is not in the shipped environment, so a GeoPackage cannot be
+    written without adding a dependency for a sidecar.
+
+    Interior rings are dropped deliberately: a void inside the survey is
+    recorded as its own feature with kind "no_measurement" rather than as a
+    hole in the active polygon, so a consumer reading only the outline gets
+    the survey's extent and a consumer reading the attributes gets the
+    caveat.
+    """
+    import json
+
+    from rasterio import features
+
+    feats = []
+
+    def rings(m, kind):
+        for geom, v in features.shapes(np.asarray(m, "uint8"), mask=m,
+                                       transform=_affine(grid),
+                                       connectivity=4):
+            if v != 1:
+                continue
+            ring = geom["coordinates"][0]
+            xs = [q[0] for q in ring]
+            ys = [q[1] for q in ring]
+            area = abs(sum(xs[i] * ys[i + 1] - xs[i + 1] * ys[i]
+                           for i in range(len(xs) - 1))) / 2.0
+            feats.append({
+                "type": "Feature",
+                "properties": {"poly_id": len(feats) + 1, "kind": kind,
+                               "area_m2": round(area, 2),
+                               "area_ha": round(area / 10000.0, 4)},
+                "geometry": {"type": "Polygon", "coordinates": [ring]}})
+
+    rings(np.asarray(mask, bool), "active")
+    if voids is not None and np.asarray(voids, bool).any():
+        rings(np.asarray(voids, bool), "no_measurement")
+    with open(path, "w") as fh:
+        json.dump({"type": "FeatureCollection", "features": feats}, fh)
+    return {"path": path, "features": len(feats),
+            "active": sum(1 for f in feats
+                          if f["properties"]["kind"] == "active"),
+            "voids": sum(1 for f in feats
+                         if f["properties"]["kind"] == "no_measurement")}
 
 
 def finalise(dem, grid, wkt, path, radius_m, nodata_in=-9999.0,

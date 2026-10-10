@@ -251,11 +251,18 @@ def g1(dem_path, out_dir, keep_layers=True, progress=None, stem=None):
     for name, transparency, mode, brightness, contrast, gamma in G1_LAYERS:
         progress("visualize", "computing %s" % name)
         raw = compute_layer(name, dem, cell)
+        # Centre before writing, not only before blending. rvt crops a border
+        # off some layers -- the multiple hillshade loses one cell on every
+        # side -- and writing the cropped array gave a sidecar a cell smaller
+        # than the DEM with its origin shifted half a cell, so it would not
+        # register against the other three in a GIS. The composite was always
+        # correct because it centred first; the layer files were not.
+        raw = _centre_into(raw, dem.shape)
         if keep_layers:
             written["layers"][name] = _write_float(
                 raw, os.path.join(layer_dir, "%s_%s.tif" % (stem, name)),
                 profile, crs)
-        layer = normalise(_centre_into(raw, dem.shape))
+        layer = normalise(raw)
         layer = adjust(layer, brightness, contrast, gamma)
         canvas = blend(canvas, layer, mode, 1.0 - transparency / 100.0)
 
