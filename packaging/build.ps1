@@ -27,8 +27,9 @@
 [CmdletBinding()]
 param(
     [string]$EnvName = "replicalm",
-    [string]$Version = "1.0.0",
+    [string]$Version = "1.1.0",
     [switch]$SkipEnv,
+    [switch]$Force,
     [switch]$SkipInstaller
 )
 
@@ -118,10 +119,16 @@ New-Item -ItemType Directory -Force -Path (Join-Path $appDir "src") | Out-Null
 Copy-Item (Join-Path $root "src\replicalm") (Join-Path $appDir "src\replicalm") `
     -Recurse -Force -Exclude "__pycache__"
 Copy-Item (Join-Path $here "gui.py")  $appDir -Force
+# -Exclude does not filter nested directories under -Recurse, so the copy above
+# brings every __pycache__ with it. The first 1.1.0 build shipped 30 .pyc files,
+# 17 of them compiled by a Python the bundled environment is not. That is litter
+# in a published artifact and misleading to anyone who inspects it.
+Get-ChildItem $appDir -Recurse -Directory -Filter "__pycache__" -ErrorAction SilentlyContinue |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 Copy-Item (Join-Path $root "config.py") $appDir -Force
 # the installed README is written for someone using the program, not for
 # someone reading the repository
-Copy-Item (Join-Path $here "Replicalm-README.md") (Join-Path $appDir "README.md") -Force
+Copy-Item (Join-Path $here "Replicalm-README-2.0.md") (Join-Path $appDir "README.md") -Force
 if (Test-Path (Join-Path $root "docs")) {
     Copy-Item (Join-Path $root "docs") (Join-Path $appDir "docs") -Recurse -Force
 }
@@ -147,6 +154,19 @@ set "PROJ_LIB=%REPLICALM_HOME%env\Library\share\proj"
 set "PYTHONPATH=%REPLICALM_HOME%src;%PYTHONPATH%"
 "%REPLICALM_HOME%env\python.exe" -m replicalm.pipeline %*
 "@ | Set-Content (Join-Path $appDir "replicalm-cli.cmd") -Encoding ASCII
+
+# Batch entry point. The window processes one file after another; this runs
+# several at once and sizes how many to available memory, which is what a
+# survey of hundreds of tiles needs.
+@"
+@echo off
+set "REPLICALM_HOME=%~dp0"
+set "PATH=%REPLICALM_HOME%env;%REPLICALM_HOME%env\Libraryin;%REPLICALM_HOME%env\Scripts;%PATH%"
+set "GDAL_DATA=%REPLICALM_HOME%env\Library\share\gdal"
+set "PROJ_LIB=%REPLICALM_HOME%env\Library\share\proj"
+set "PYTHONPATH=%REPLICALM_HOME%src;%PYTHONPATH%"
+"%REPLICALM_HOME%env\python.exe" -m replicalm.batch %*
+"@ | Set-Content (Join-Path $appDir "replicalm-batch.cmd") -Encoding ASCII
 
 # --- licences --------------------------------------------------------------
 $licDir = Join-Path $stage "licenses"
@@ -189,6 +209,17 @@ if (-not $iscc) {
           "JRSoftware.InnoSetup -e), or re-run with -SkipInstaller."
 }
 Write-Host "    using $iscc"
+
+# A released installer is a published artifact: its hash is what someone
+# downloaded and what a DOI record describes. Rebuilding over one silently
+# replaces that, so an existing output has to be removed deliberately rather
+# than by forgetting which version this build is.
+$target = Join-Path $here "dist\Replicalm-$Version-setup.exe"
+if ((Test-Path $target) -and -not $Force) {
+    throw ("$target already exists. That file may be a published release; " +
+           "building over it would change what its checksum refers to. Pass " +
+           "-Force to replace it deliberately, or raise -Version.")
+}
 & $iscc "/DAppVersion=$Version" (Join-Path $here "replicalm.iss")
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
 

@@ -1,0 +1,51 @@
+I want to set up the local repository for Replicalm, push it to GitHub, and prepare it for Zenodo DOI integration. If repository or link creation cannot be completed programmatically due to authentication limitations, provide the exact commands necessary, report the status, and pause after requesting HITL assistance.
+
+Here is our plan and requirements:
+
+1. Project Metadata & Local Setup: Before creating README.md or CITATION.cff, inspect the existing project source code, documentation, installer metadata, and configuration files. Reuse project-specific, version-specific information wherever possible instead of generating generic placeholder content.
+   - Target Directory: Current working directory (Replicalm)
+   - Include these files locally:
+     - LICENSE (MIT License)
+     - README.md (Include project description, installation instructions, usage, and a placeholder section for the Zenodo DOI badge)
+     - CITATION.cff containing
+
+```yaml
+title: Replicalm
+authors:
+  - family-names: Britton
+    given-names: Benjamin J.
+affiliation: Department of Geography, College of Arts & Sciences, University of Cincinnati
+license: MIT
+version: 1.0.0
+date-released: 2026-09-24
+```
+     - .gitignore (Exclude Python virtual environments, build/dist directories, temporary files, GIS raster outputs, and binary executables like *.exe)
+
+2. Local Git Initialization:
+   - Initialize a local git repository on the `main` branch.
+   - Initial commit: 
+     "Replicalm v1.0.0 repository setup"
+   - Stage and commit the source code and metadata files.
+   - Note: Do NOT stage `Replicalm-1.0.0-setup.exe` or raw data binaries directly into Git tracking. Do NOT stage or commit Replicalm-1.0.0-setup.exe into Git version control. Preserve it locally. The existing Replicalm-1.0.0-setup.exe is the authoritative v1.0.0 release installer. Do not rebuild, regenerate, replace, or modify it unless explicitly instructed. After the Git repository has been successfully created and pushed to GitHub, upload Replicalm-1.0.0-setup.exe as the official GitHub Release asset for v1.0.0. This installer is the primary end-user distribution package and should subsequently be archived through the Zenodo DOI workflow and Scholar@UC deposit process.
+
+3. GitHub Repository Creation & Push:
+   - Create a new public repository under my account (`benjbritton`) named `replicalm` (do not initialize with remote README/License).
+   - Add remote origin: `git remote add origin git@github.com:benjbritton/replicalm.git`
+   - Push initial commit to `main`.
+   - After repository creation and push, report:
+- git status
+- current branch
+- latest commit hash
+- git remote -v output
+- GitHub repository URL
+ 
+Then pause and request user for HITL instructions, including your suggestions for next steps.
+
+4. Release & Archiving Workflow:
+   - Step A (GitHub Creation & Push): Complete Step 3 to ensure `main` is published to GitHub.
+   - Step B (PAUSE for HITL): Report status and pause execution. Prompt me to log into Zenodo and toggle `benjbritton/replicalm` to ON.
+   - Step C (Release Creation): Once I confirm Zenodo is enabled, run `gh release create v1.0.0` and attach `Replicalm-1.0.0-setup.exe`.
+   - Step D (Post-Release): Prompt me to grab the Zenodo DOI badge to update `README.md` and upload the installer to Scholar@UC (`brittobj`).
+
+
+Please begin by generating the local files (LICENSE, README.md, CITATION.cff, .gitignore) and running the initial local Git commands. Stop and prompt me when remote authentication or web dashboard steps are required.

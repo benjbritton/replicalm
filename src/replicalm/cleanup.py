@@ -291,6 +291,133 @@ def height_above_floor(x, y, z, patch=0.75, percentile=10.0):
     return z - floor
 
 
+def height_above_plane(x, y, z, patch=0.75, plane_patch=None,
+                       min_neighbours=6, chunk=None, verbose=False):
+    """Height of each return above a plane fitted to its neighbourhood.
+
+    WHY THIS EXISTS
+    ---------------
+    `height_above_floor` measures each return against the 10th percentile of raw
+    elevations within `patch`. On a slope that percentile sits at the downhill
+    edge of the disc, so an upslope return is compared against ground that is
+    genuinely lower than it. The disc spans about 1.5*tan(theta) of elevation,
+    which reaches the 0.20 m threshold at about 9.5 degrees -- and measurement
+    on l0s395 found exactly that: the rule moves the surface not at all below
+    9.5 degrees, by 5 cm at 25 to 40 degrees and by 12 cm beyond, with 99% of
+    the movement downward. It shaves inclines.
+
+    Fitting a plane removes the terrain component, so what is left is what
+    actually stands above the local surface. On flat ground the plane is flat
+    and this reduces to the same measurement as before.
+
+    ROBUSTNESS
+    ----------
+    A least-squares plane through a neighbourhood that is half vegetation sits
+    above the soil, and would then hide the vegetation it is meant to expose. So
+    the fit is done twice: once over every neighbour, then again over only those
+    at or below the first plane. That pulls the reference down onto the ground
+    without needing a per-neighbourhood percentile, which would mean sorting
+    inside every disc.
+
+    THE FIT RADIUS IS NOT THE THRESHOLD RADIUS
+    ------------------------------------------
+    `plane_patch` sets how far the plane is fitted over, separately from
+    `patch`. They are different jobs. The threshold asks "how far above the
+    local surface does this return stand", which wants a small neighbourhood.
+    The plane has to *be* the local surface, and a clump of scrub wider than the
+    disc it is fitted over will tilt the plane onto itself and escape. Fitting
+    over a wider radius than the clump keeps the reference on the ground.
+
+    Too wide and the plane stops following real curvature -- measured on a road
+    that is demonstrably bare, a plane fitted over 20 m reports 45% of its
+    returns as standing above the surface where a 3 m plane reports none. So
+    this wants to sit above the clump size and well below the terrain's own
+    radius of curvature. It defaults to `patch`, which reproduces the earlier
+    behaviour exactly.
+
+    COST
+    ----
+    Neighbour lists are built and reduced in chunks, and the per-point normal
+    equations are accumulated with `np.bincount` rather than a Python loop, so
+    the whole thing is array work. The chunk size is derived from the expected
+    neighbour count so that widening the fit radius does not quietly multiply
+    peak memory.
+    """
+    from scipy.spatial import cKDTree
+    x = np.asarray(x, float); y = np.asarray(y, float); z = np.asarray(z, float)
+    n = len(z)
+    if n == 0:
+        return np.zeros(0, float)
+    fit_r = float(plane_patch or patch)
+    tree = cKDTree(np.c_[x, y])
+    out = np.zeros(n, float)
+
+    if chunk is None:
+        # hold the flattened neighbour arrays to roughly 40 million entries
+        # whatever the radius, so a wider fit costs time and not memory
+        span = max((x.max() - x.min()) * (y.max() - y.min()), 1.0)
+        per_point = max(4.0, np.pi * fit_r * fit_r * n / span)
+        chunk = int(max(50000, min(500000, 4e7 / per_point)))
+
+    for start in range(0, n, chunk):
+        stop = min(start + chunk, n)
+        idx = np.arange(start, stop)
+        nb = tree.query_ball_point(np.c_[x[idx], y[idx]], fit_r)
+        counts = np.fromiter((len(q) for q in nb), int, len(nb))
+        flat = np.fromiter((j for q in nb for j in q), int, int(counts.sum()))
+        owner = np.repeat(np.arange(len(idx)), counts)
+
+        # offsets from each point to its neighbours
+        dx = x[flat] - x[idx][owner]
+        dy = y[flat] - y[idx][owner]
+        zz = z[flat]
+
+        def fit(mask):
+            """Normal equations for z = a + b*dx + c*dy, per point."""
+            w = mask.astype(float)
+            m = len(idx)
+            S = lambda v: np.bincount(owner, weights=v * w, minlength=m)
+            n_ = S(np.ones_like(dx))
+            Sx, Sy = S(dx), S(dy)
+            Sxx, Sxy, Syy = S(dx * dx), S(dx * dy), S(dy * dy)
+            Sz, Sxz, Syz = S(zz), S(dx * zz), S(dy * zz)
+            A = np.empty((m, 3, 3))
+            A[:, 0, 0] = n_;  A[:, 0, 1] = Sx;  A[:, 0, 2] = Sy
+            A[:, 1, 0] = Sx;  A[:, 1, 1] = Sxx; A[:, 1, 2] = Sxy
+            A[:, 2, 0] = Sy;  A[:, 2, 1] = Sxy; A[:, 2, 2] = Syy
+            b = np.stack([Sz, Sxz, Syz], axis=1)[:, :, None]
+            # a ridge keeps a degenerate neighbourhood -- collinear points, or
+            # too few -- from producing a wild plane instead of simply failing
+            A[:, 0, 0] += 1e-9
+            A[:, 1, 1] += 1e-9
+            A[:, 2, 2] += 1e-9
+            ok = n_ >= min_neighbours
+            coef = np.zeros((m, 3))
+            if ok.any():
+                coef[ok] = np.linalg.solve(A[ok], b[ok])[:, :, 0]
+            return coef, ok
+
+        coef, ok = fit(np.ones(len(dx), bool))
+        # second pass over the neighbours at or below the first plane
+        pred = coef[owner, 0] + coef[owner, 1] * dx + coef[owner, 2] * dy
+        low = zz <= pred
+        coef2, ok2 = fit(low)
+        use = np.where(ok2[:, None], coef2, coef)
+
+        # the plane's value AT the point is its intercept, since dx = dy = 0
+        h = z[idx] - use[:, 0]
+        # where the neighbourhood was too thin to fit, fall back to the
+        # percentile rule rather than report a height from nothing
+        thin = ~ok
+        if thin.any():
+            h[thin] = 0.0
+        out[start:stop] = h
+        if verbose:
+            print("    plane cleanup: %d/%d points, %d too thin to fit"
+                  % (stop, n, int(thin.sum())), flush=True)
+    return out
+
+
 def clear(arr, patch=0.75, height=0.20, percentile=10.0, ground_class=2,
           to_class=1, verbose=True):
     """The Clear rule. Returns (array, report).

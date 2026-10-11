@@ -19,8 +19,8 @@ authors:
       Department of Geography, College of Arts & Sciences,
       University of Cincinnati
 license: MIT
-version: 1.0.0
-date-released: "2026-09-24"
+version: 2.0.0
+date-released: "2026-10-10"
 repository-code: "https://github.com/benjbritton/replicalm"
 doi: "10.5281/zenodo.23110738"
 identifiers:
@@ -29,7 +29,7 @@ identifiers:
     description: "Concept DOI for the source, resolves to the latest version"
   - type: doi
     value: "10.5281/zenodo.23110800"
-    description: "The Windows installer for version 1.0.0, archived separately"
+    description: "The Windows installer, archived separately"
 keywords:
   - lidar
   - bare-earth DEM

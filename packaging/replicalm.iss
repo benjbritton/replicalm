@@ -11,7 +11,10 @@
 ;   https://jrsoftware.org/isdl.php
 
 #define AppName      "Replicalm"
-#define AppVersion   "1.0.0"
+; Overridden by build.ps1 with /DAppVersion. The literal is kept current
+; so a bare ISCC run cannot quietly stamp a superseded version onto a
+; new build.
+#define AppVersion   "2.0.0"
 #define AppPublisher "Benjamin Jay Britton"
 #define AppURL       "https://github.com/benjbritton/Replicalm"
 #define StageDir     "stage"

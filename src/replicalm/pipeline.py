@@ -11,27 +11,30 @@ WHAT IT DOES
     interpolate   kriging onto a declared grid, radius scaled to point density
     finalise      fill enclosed holes, trim the one-sided fringe, write with
                   zero meaning no data
-    visualize     optional, and a shell-out rather than a reimplementation
+    visualize     optional: the G1 composite and the four layers it blends
 
-THE VISUALIZATION IS SOMEONE ELSE'S RECIPE
-------------------------------------------
-G1 is the four-layer blend published as Table 3 of Britton et al. 2025, and the
-script that produces it (`GLiHT_rvt.py`) belongs to that work rather than to
-this package. It is called, not copied, so that one definition of the recipe
-exists and this package cannot drift from it.
+THE VISUALIZATION USED TO BE A SHELL-OUT AND DID NOT WORK
+---------------------------------------------------------
+G1 is the four-layer blend published as Table 3 of Britton et al. 2025. This
+module used to call `GLiHT_rvt.py` for it, found beside the interpreter or at a
+path on the machine the script was written on, so that one definition of the
+recipe existed and this package could not drift from it. That was the right
+instinct and the wrong mechanism: the script is not in the installer, so on
+every user's machine the step returned "GLiHT_rvt.py not found", left the DEM
+alone, and reported it only in a log line nobody reads. The feature was absent
+rather than optional.
 
-It is also optional. It needs `rvt-py`, which is Apache 2.0 from ZRC SAZU and
-the University of Ljubljana, and which pulls in GDAL and matplotlib. A run that
-only wants elevation should not have to install any of that, so the import and
-the call are deferred and their absence is reported rather than raised.
+The recipe is now in `replicalm.visualize`, which calls `rvt.vis` as a library.
+`rvt-py` was already pinned in packaging/environment.yml and already shipped,
+so this costs no new dependency and nothing in installer size. The import stays
+deferred: a run that only wants elevation should not need the visualization
+stack present, and its absence is reported rather than raised.
 
-Point the shell-out at the script with REPLICALM_RVT_SCRIPT, or pass
-`rvt_script=`. Without it, `process` produces the DEM and says plainly that the
-image step was skipped.
+What it writes is G1 and its four source layers under `<out>/G1/`, and nothing
+else. RVT remains the tool for relief visualization; this renders one image so
+the operator can look at what the ground filter produced.
 """
 import os
-import subprocess
-import sys
 import time
 
 import numpy as np
@@ -46,9 +49,9 @@ def _noop(stage, message, fraction=None):
 
 
 def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
-            rvt_script=None, progress=None, keep_ground=True,
+            progress=None, keep_ground=True,
             derive_cell=True, grid=None, on_grid=None,
-            reuse_ground=False):
+            reuse_ground=False, ground_stage="after"):
     """Process one tile. Returns a dict describing everything written.
 
     `progress(stage, message, fraction)` is called as work proceeds, so a GUI
@@ -73,6 +76,22 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     classification is the expensive half and does not depend on the lattice.
     It reuses whatever is on disk without checking it came from this config, so
     it is for a second grid over the same run, not for resuming a changed one.
+
+    `keep_ground` saves the ground returns as LAZ. `ground_stage` chooses when:
+
+      "after"   (default) the ground Clear kept, written to
+                `<stem>_ground_cleaned.laz`. This is the surface the DEM was
+                actually built from.
+      "before"  the ground as the filter classified it, residual low vegetation
+                included, written to `<stem>_ground.laz`. Re-deriving the
+                cleanup at another threshold starts here and skips
+                classification, which is the expensive half.
+
+    The two go to different filenames deliberately. `reuse_ground` looks for
+    `<stem>_ground.laz`, so a cleaned file saved under that name would be
+    cleaned a second time on the next run, quietly removing more ground each
+    pass. Keeping the names apart makes that impossible rather than merely
+    unlikely.
     """
     from . import classify, finalise, grid as G, interpolate, kriging as K
     from .config import PRESETS, verify_baseline
@@ -106,6 +125,7 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
 
     arr, _ = classify.read_points(ground_las)
     gnd = arr[arr["Classification"] == 2]
+    cleaned = False
 
     # Residual low vegetation the ground filter accepted. Removing it is the
     # delivered method; set clean_vegetation False for the unfiltered surface,
@@ -113,16 +133,28 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
     # comparison figures are measured against.
     if getattr(cfg, "clean_vegetation", False) and len(gnd):
         from . import cleanup
-        above = cleanup.height_above_floor(
-            gnd["X"].astype("f8"), gnd["Y"].astype("f8"),
-            gnd["Z"].astype("f8"),
-            patch=getattr(cfg, "clean_patch_m", 0.75),
-            percentile=getattr(cfg, "clean_percentile", 10.0))
+        gx = gnd["X"].astype("f8"); gy = gnd["Y"].astype("f8")
+        gz = gnd["Z"].astype("f8")
+        if getattr(cfg, "clean_slope_aware", False):
+            fit_r = (getattr(cfg, "clean_plane_patch_m", None)
+                     or getattr(cfg, "clean_patch_m", 0.75))
+            progress("classify", "cleanup measured against a plane fitted over "
+                                 "%.2f m, so the rule does not fire on slope"
+                     % fit_r)
+            above = cleanup.height_above_plane(
+                gx, gy, gz, patch=getattr(cfg, "clean_patch_m", 0.75),
+                plane_patch=fit_r)
+        else:
+            above = cleanup.height_above_floor(
+                gx, gy, gz,
+                patch=getattr(cfg, "clean_patch_m", 0.75),
+                percentile=getattr(cfg, "clean_percentile", 10.0))
         keep = above <= getattr(cfg, "clean_height_m", 0.20)
         progress("classify", "removed %d of %d ground returns (%.1f%%) standing "
                              "above the ground around them"
                  % ((~keep).sum(), len(keep), 100 * (~keep).mean()))
         gnd = gnd[keep]
+        cleaned = True
 
     if len(gnd) < cfg.min_ground_points:
         raise PipelineError(
@@ -168,14 +200,70 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
              "%d ground points, %.2f per m2, search radius %.2f m"
              % (len(z), density, radius), 0.35)
 
-    v = K.fit_variogram(x, y, z, model=cfg.variogram_model,
-                        max_lag=cfg.variogram_fit_lag_m * 2)
-    dem, info = K.krige_grid(x, y, z, g, radius=radius,
-                             max_points=cfg.max_points,
-                             min_points=cfg.min_points, variogram=v,
-                             verbose=False,
-                             chunk_cells=getattr(cfg, "chunk_cells", 1000000))
-    if info["fallback_fraction"] > 0.25:
+    # Coincident XY make every solver's system singular, so the points are
+    # conditioned once here rather than inside whichever engine runs. See
+    # preprocess.dedupe_xy: the kriging path used to carry its own copy, and a
+    # spline tried on the same data failed for the same reason because the fix
+    # was not reachable from outside kriging.
+    from .preprocess import dedupe_xy, describe
+    # "mean", not "lowest": by this point the set is already ground,
+    # and a delivered or classified ground population can hold two
+    # returns at one XY straddling the surface. Taking the minimum
+    # biases every collision downward; averaging has no preference.
+    x, y, z, dedupe_report = dedupe_xy(x, y, z, keep="mean")
+    note = describe(dedupe_report)
+    if note:
+        progress("interpolate", note)
+
+    engine = getattr(cfg, "interpolator", "kriging")
+    if engine == "spline":
+        from . import spline as S
+        progress("interpolate",
+                 "minimum curvature with tension %.3f, %d neighbours"
+                 % (getattr(cfg, "spline_tension", S.DEFAULT_TENSION),
+                    getattr(cfg, "spline_neighbours", S.DEFAULT_NEIGHBOURS)))
+        dem, info = S.spline_grid(
+            x, y, z, g,
+            tension=getattr(cfg, "spline_tension", S.DEFAULT_TENSION),
+            neighbours=getattr(cfg, "spline_neighbours", S.DEFAULT_NEIGHBOURS),
+            smoothing=getattr(cfg, "spline_smoothing", S.DEFAULT_SMOOTHING),
+            min_points=cfg.min_points, verbose=False,
+            chunk_cells=getattr(cfg, "chunk_cells", 1000000))
+    elif engine == "kriging":
+        v = K.fit_variogram(x, y, z, model=cfg.variogram_model,
+                            max_lag=cfg.variogram_fit_lag_m * 2)
+        dem, info = K.krige_grid(x, y, z, g, radius=radius,
+                                 max_points=cfg.max_points,
+                                 min_points=cfg.min_points, variogram=v,
+                                 verbose=False,
+                                 chunk_cells=getattr(cfg, "chunk_cells",
+                                                     1000000))
+    elif engine in ("biharmonic", "surfer"):
+        # The Surfer half of the reference chain is a global minimum-curvature
+        # solve, and this is the engine that reproduces it. It was measured
+        # against the delivered archive at 0.0524 m with a roughness ratio of
+        # 0.939 while the local spline above loses half the coherent detail
+        # below 1 m -- and until now it was not reachable from here at all,
+        # only from analysis scripts, so no released build has ever run it.
+        from . import surfer_algoA as SA
+        progress("interpolate",
+                 "global biharmonic minimum curvature, %.0f m cores with a "
+                 "%.0f m buffer, pooling %.2f m"
+                 % (getattr(cfg, "biharmonic_core_m", SA.DEFAULT_CORE_M),
+                    getattr(cfg, "biharmonic_buffer_m", SA.DEFAULT_BUFFER_M),
+                    getattr(cfg, "biharmonic_pool_sigma_m",
+                            SA.DEFAULT_POOL_SIGMA_M)))
+        dem, info = SA.surfer_grid_blocked(
+            x, y, z, g,
+            core_m=getattr(cfg, "biharmonic_core_m", SA.DEFAULT_CORE_M),
+            buffer_m=getattr(cfg, "biharmonic_buffer_m", SA.DEFAULT_BUFFER_M),
+            pool_sigma_m=getattr(cfg, "biharmonic_pool_sigma_m",
+                                 SA.DEFAULT_POOL_SIGMA_M),
+            verbose=False, progress=progress)
+    else:
+        raise PipelineError("unknown interpolator %r; expected 'kriging', "
+                            "'spline' or 'biharmonic'" % engine)
+    if info.get("fallback_fraction", 0.0) > 0.25:
         progress("interpolate",
                  "%.0f%% of cells fell back to inverse distance: the "
                  "neighbourhood is too tightly packed for the covariance model"
@@ -183,14 +271,133 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
 
     progress("finalise", "filling holes, trimming the coverage edge", 0.75)
     wkt = interpolate.source_srs(las_path)
-    dem_path = os.path.join(out_dir, stem + "_DEM.tif")
-    report = finalise.finalise(dem, g, wkt, dem_path, radius_m=radius,
-                               nodata_in=-9999.0,
-                               erode_factor=cfg.erode_factor, verbose=False)
 
-    out = {"dem": dem_path, "ground_las": ground_las if keep_ground else None,
+    # Save the ground, if asked, at the stage asked for. "after" is the surface
+    # the DEM was built from; "before" is what the filter produced and is the
+    # one to keep if the cleanup threshold may be revisited.
+    kept_ground = None
+    if keep_ground:
+        if ground_stage == "before":
+            kept_ground = ground_las
+        else:
+            cleaned_las = os.path.join(out_dir, stem + "_ground_cleaned.laz")
+            try:
+                classify.write_points(gnd, cleaned_las, cfg, srs=wkt)
+                kept_ground = cleaned_las
+                progress("classify", "ground after cleanup written: %s"
+                         % os.path.basename(cleaned_las))
+            except Exception as exc:
+                progress("classify", "could not write the cleaned ground (%s); "
+                         "keeping the classified ground instead"
+                         % str(exc)[:60])
+                kept_ground = ground_las
+            if kept_ground != ground_las and not cleaned:
+                # nothing was removed, so the two files would be identical
+                progress("classify", "cleanup did not run for this profile; "
+                         "the saved ground is the classified ground")
+
+    dem_path = os.path.join(out_dir, stem + "_DEM.tif")
+    # Two numbers, two causes, kept apart on purpose.
+    #
+    # The footprint radius is the interpolator's own reach: a cell holds a
+    # measurement when a ground return lies within it, and beyond that the
+    # surface is extrapolated rather than interpolated. The reference products
+    # make this visible -- Surfer kriged at a 20 m search radius with a
+    # minimum of one point, and the archive's furthest cell is 19.73 m from a
+    # return. So it is `search_radius_m`, not a fitted threshold. Choosing the
+    # radius at the knee of the coverage curve was tried and rejected; see
+    # finalise.auto_support_radius.
+    #
+    # The strip is the flight-pass stitching seam, about 21 m wide, where
+    # overlapping passes were merged with differing ground classification. It
+    # is a property of the acquisition, not of the interpolation, and the
+    # reference applies it in metres rather than cells: measured against the
+    # production DEMs it removes 20.95, 20.75 and 21.00 m per side at 0.33,
+    # 0.5 and 1 m resolution.
+    edge_fix = getattr(cfg, "edge_fix_m", None)
+    strip_m = getattr(cfg, "edge_strip_m", None)
+    axis = getattr(cfg, "edge_axis", None) or finalise.infer_transect_axis(
+        g, os.path.basename(las_path))
+    support_radius = (getattr(cfg, "footprint_radius_m", None)
+                      or getattr(cfg, "search_radius_m", None) or radius)
+
+    # The footprint is one span per row between the first and last ground
+    # return, which is the geometry mask_dem_edges.py produces in the G1
+    # reprocessing work. It replaces support_mask, whose thresholded distance
+    # transform drew the boundary as a union of discs and rendered as a
+    # scalloped margin with detached islands.
+    #
+    # The footprint cannot simply be dropped: this interpolator has no
+    # distance limit and fills the whole lattice, so without it the across-
+    # track strip would leave the entire bounding rectangle less its margins.
+    # Surfer bounded its own output, which is why the reference script needed
+    # nothing of the kind.
+    footprint_report = None
+    if not getattr(cfg, "edge_fix_enabled", True):
+        support = None
+        strip_m = None
+        trim_radius = 0.0
+        progress("finalise", "edge fixing is off: no footprint, no "
+                 "across-track strip and no erosion, so every cell the "
+                 "interpolator produced is kept")
+    else:
+        ends_m = getattr(cfg, "edge_strip_ends_m", None)
+        support, voids, footprint_report = finalise.data_footprint(
+            x, y, g, support_radius, axis=axis, strip_m=strip_m,
+            ends_m=ends_m)
+        progress("finalise",
+                 "footprint: within %.1f m of a ground return, closed into "
+                 "%d area(s), %d cells; strip %.1f m across-track and "
+                 "%.1f m at the ends"
+                 % (support_radius, footprint_report["areas"],
+                    footprint_report["cells"], strip_m or 0.0,
+                    ends_m or 0.0))
+        # Voids inside the survey get a continuous surface, not a sentinel
+        # elevation: a cell written as 1 would sit a hundred metres below its
+        # neighbours and every derived layer would see a cliff, with the
+        # artifact spreading about five metres past the hole. Where they are
+        # is recorded instead of being encoded in the elevation.
+        have_value = np.isfinite(dem) & (dem != -9999.0)
+        dem, filled = finalise.fill_voids(dem, have_value, support)
+        if filled.any():
+            progress("finalise", "%d cell(s) inside the survey carried no "
+                     "measurement and were filled; recorded in the report"
+                     % int(filled.sum()))
+            footprint_report["voids_filled"] = int(filled.sum())
+        # the strip is already applied inside data_footprint
+        strip_m = None
+        trim_radius = 0.0
+    if strip_m:
+        progress("finalise", "edge strip: %.1f m across-track (%s), the "
+                 "reference convention" % (strip_m, axis))
+    if footprint_report is not None:
+        try:
+            vec = finalise.write_footprint_vectors(
+                support, g, wkt,
+                os.path.join(out_dir, stem + "_footprint.geojson"),
+                voids=(filled if 'filled' in dir() else None))
+            footprint_report["vectors"] = vec
+            progress("finalise", "footprint written as %d polygon(s): %s"
+                     % (vec["features"], os.path.basename(vec["path"])))
+        except Exception as exc:
+            progress("finalise", "could not write the footprint vectors (%s)"
+                     % str(exc)[:60])
+    report = finalise.finalise(dem, g, wkt, dem_path, radius_m=trim_radius,
+                               nodata_in=-9999.0,
+                               erode_factor=cfg.erode_factor,
+                               support=support, strip_m=strip_m, axis=axis,
+                               verbose=False)
+
+    out = {"dem": dem_path, "ground_las": kept_ground,
+           "ground_stage": ground_stage if kept_ground else None,
            "ground_points": int(len(z)), "density": density,
            "search_radius_m": radius, "cell_m": cell_m,
+           "edge_fix_m": edge_fix,
+           "edge_strip_m": (float(getattr(cfg, "edge_strip_m", 0.0) or 0.0)
+                            if footprint_report else None),
+           "edge_axis": axis, "footprint": footprint_report,
+           "footprint_radius_m": (float(support_radius)
+                                  if footprint_report else None),
            "fallback_fraction": info["fallback_fraction"],
            # The correlation range is what explains the fallback: when the
            # nearest max_points neighbours all sit inside it, their pairwise
@@ -204,65 +411,61 @@ def process(las_path, out_dir, cfg=None, cell_m=None, make_g1=False,
            "locked_baseline": baseline, "seconds": round(time.time() - t0, 1)}
     out.update({k: report[k] for k in
                 ("filled_cells", "holes", "erode_cells", "erode_m",
-                 "cells_after_trim", "filled_fraction")})
-    if not keep_ground and os.path.exists(ground_las):
+                 "cells_after_trim", "filled_fraction",
+                 "interior_cells_restored")})
+    if kept_ground != ground_las and os.path.exists(ground_las):
         os.remove(ground_las)
 
     if make_g1:
         progress("visualize", "building the G1 composite", 0.85)
-        out["g1"] = visualize(dem_path, out_dir, rvt_script=rvt_script,
+        out["g1"] = visualize(dem_path, out_dir,
                               progress=progress)
+    # The sidecar was written from the configuration before processing, so
+    # it carried the settings asked for and not the values resolved at run
+    # time -- a footprint radius of None where 20.0 m was used, an axis of
+    # None where "x" was inferred. The run's own account is merged in here,
+    # which is the point of keeping a sidecar beside the output at all.
+    try:
+        import json as _json
+        cfg_path = os.path.join(out_dir, stem + "_config.json")
+        with open(cfg_path) as _fh:
+            _side = _json.load(_fh)
+        _side["run"] = {k: v for k, v in out.items()
+                        if isinstance(v, (str, int, float, bool, list, dict))
+                        or v is None}
+        with open(cfg_path, "w") as _fh:
+            _json.dump(_side, _fh, indent=2, default=str)
+    except Exception as exc:
+        progress("done", "could not record the run in the sidecar (%s)"
+                 % str(exc)[:60])
+
     progress("done", "finished in %.0f s" % (time.time() - t0), 1.0)
     return out
 
 
-def find_rvt_script(explicit=None):
-    """Locate GLiHT_rvt.py, or return None. Never raises."""
-    for candidate in (explicit, os.environ.get("REPLICALM_RVT_SCRIPT"),
-                      os.path.join(os.path.dirname(sys.executable),
-                                   "GLiHT_rvt.py"),
-                      r"C:\g1\tools\GLiHT_rvt.py"):
-        if candidate and os.path.isfile(candidate):
-            return candidate
-    return None
+def visualize(dem_path, out_dir, progress=None, keep_layers=True, **_legacy):
+    """The G1 composite and its four source layers, under `<out_dir>/G1/`.
 
+    Delegates to `replicalm.visualize`, which calls rvt as a library. Returns
+    what was written, or a dict saying why nothing was -- the DEM is the
+    product and a missing visualization stack must not fail a run that has
+    already produced one.
 
-def visualize(dem_path, out_dir, rvt_script=None, res="0p5m", progress=None):
-    """Produce the G1 composite by calling the published recipe.
-
-    Returns the output directory, or a dict explaining why nothing was made.
-    The recipe expects DEMs named `*_DEM_<res>_v1.tif` under a root it walks,
-    so the DEM is linked into that shape rather than renamed in place.
+    `**_legacy` swallows `rvt_script=` and `res=`, which the shell-out needed
+    and this does not. Callers that still pass them keep working.
     """
     progress = progress or _noop
-    script = find_rvt_script(rvt_script)
-    if not script:
-        progress("visualize", "GLiHT_rvt.py not found; set REPLICALM_RVT_SCRIPT "
-                              "to enable the image step. DEM is unaffected.")
-        return {"skipped": "GLiHT_rvt.py not found"}
-
-    stem = os.path.splitext(os.path.basename(dem_path))[0]
-    staged_root = os.path.join(out_dir, "_rvt_in")
-    staged_dir = os.path.join(staged_root, "tile")
-    os.makedirs(staged_dir, exist_ok=True)
-    staged = os.path.join(staged_dir, "%s_DEM_%s_v1.tif" % (stem, res))
-    if not os.path.exists(staged):
-        try:
-            os.link(dem_path, staged)          # cheap; same volume
-        except OSError:
-            import shutil
-            shutil.copy2(dem_path, staged)
-
-    rvt_root = os.path.join(out_dir, "rvt")
-    cmd = [sys.executable, script, "--res", res, "--no-metadata",
-           "--workers", "1", "--dem-root", staged_root, "--rvt-root", rvt_root]
-    progress("visualize", "running %s" % os.path.basename(script))
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-3:]
-        progress("visualize", "the image step failed: %s" % " / ".join(tail))
-        return {"failed": proc.returncode, "stderr": "\n".join(tail)}
-    return {"rvt_root": rvt_root}
+    try:
+        from . import visualize as _vis
+    except ImportError as exc:                       # pragma: no cover
+        progress("visualize", "the image step is unavailable: %s" % exc)
+        return {"skipped": str(exc)}
+    try:
+        return _vis.g1(dem_path, out_dir, keep_layers=keep_layers,
+                       progress=progress)
+    except Exception as exc:
+        progress("visualize", "the image step failed: %s" % exc)
+        return {"failed": str(exc)}
 
 
 def main(argv=None):
@@ -278,10 +481,43 @@ def main(argv=None):
     p.add_argument("las", help="input LAS or LAZ")
     p.add_argument("-o", "--out", default=".", help="output directory")
     p.add_argument("--cell", type=float, default=None,
-                   help="output cell size in metres (default 1.0)")
-    p.add_argument("--g1", action="store_true", help="also build the G1 image")
-    p.add_argument("--rvt-script", default=None,
-                   help="path to GLiHT_rvt.py for the image step")
+                   help="output cell size in metres; default is derived from "
+                        "measured ground-return density")
+    # The same control in the units people ask for it in. The relationship is
+    # quadratic -- 4 px/m2 is a 0.50 m cell, not 0.25 -- so this exists to stop
+    # that conversion being done wrongly by hand. Squares only, because those
+    # are the values that land on round cell sizes.
+    p.add_argument("--pixels-per-m2", type=int, default=None, metavar="N",
+                   choices=(1, 4, 9, 16, 25),
+                   help="output resolution as pixels per square metre: 1 is "
+                        "1.00 m cells, 4 is 0.50 m, 9 is 0.33 m, 16 is 0.25 m, "
+                        "25 is 0.20 m. An alternative to --cell")
+    p.add_argument("--g1", dest="g1", action="store_true",
+                   default=True, help="build the G1 image (default)")
+    p.add_argument("--no-g1", dest="g1", action="store_false",
+                   help="skip the G1 image and write only the DEM")
+    p.add_argument("--keep-ground", action="store_true",
+                   help="save the ground returns as LAZ beside the DEM")
+    p.add_argument("--slope-aware-cleanup", action="store_true",
+                   help="measure the cleanup height against a plane fitted to "
+                        "each neighbourhood instead of the 10th percentile of "
+                        "its raw elevations, so the rule stops removing ground "
+                        "for being on a slope")
+    p.add_argument("--ground-stage", choices=("after", "before"),
+                   default="after",
+                   help="which ground to save: 'after' the cleanup, the surface "
+                        "the DEM was built from (default), or 'before' it, "
+                        "which is where re-deriving the cleanup starts")
+    # The interpolation neighbourhood. Offered as a pair because the two move
+    # together: 64 points only condition well inside a radius wide enough to
+    # hold them, and 16 inside a fixed 20 m lose matrix rank on dense data.
+    # "published" is the source's own figure and measured better or neutral on
+    # both test tiles; "fast" is 7 to 9 times quicker to interpolate.
+    p.add_argument("--interpolation", choices=("published", "fast"),
+                   default=None,
+                   help="published: 64 points within a fixed 20 m, the source's "
+                        "neighbourhood and the profile default. fast: 16 points "
+                        "with the radius from density, 7-9x quicker")
     p.add_argument("--profile", "--preset", dest="preset",
                    default="clear", choices=sorted(PRESETS),
                    help="baseline | clear (default) | deep")
@@ -344,9 +580,39 @@ def main(argv=None):
     def show(stage, message, fraction=None):
         print("[%-11s] %s" % (stage, message))
 
-    out = process(a.las, a.out, cfg=cfg, cell_m=a.cell,
-                  make_g1=a.g1, rvt_script=a.rvt_script, progress=show)
+    if a.slope_aware_cleanup:
+        cfg = replace(cfg, clean_slope_aware=True)
+    if a.interpolation == "fast":
+        cfg = replace(cfg, max_points=16, min_points=3,
+                      search_radius_mode="density", search_radius_m=None)
+    elif a.interpolation == "published":
+        cfg = replace(cfg, max_points=64, min_points=1,
+                      search_radius_mode="fixed", search_radius_m=20.0)
+
+    cell = a.cell
+    if a.pixels_per_m2 is not None:
+        if a.cell is not None:
+            p.error("give --cell or --pixels-per-m2, not both")
+        cell = (1.0 / a.pixels_per_m2) ** 0.5
+        print("resolution %d px/m2 is a %.4f m cell"
+              % (a.pixels_per_m2, cell))
+
+    out = process(a.las, a.out, cfg=cfg, cell_m=cell,
+                  make_g1=a.g1, progress=show,
+                  keep_ground=a.keep_ground, ground_stage=a.ground_stage)
     print("\nDEM: %s" % out["dem"])
+    g1 = out.get("g1")
+    if isinstance(g1, dict) and g1.get("g1"):
+        print("G1: %s" % g1["g1"])
+        if g1.get("layers"):
+            print("G1 source layers: %s"
+                  % os.path.dirname(next(iter(g1["layers"].values()))))
+    elif isinstance(g1, dict):
+        print("image step not completed: %s"
+              % (g1.get("skipped") or g1.get("failed")))
+    if out.get("ground_las"):
+        print("Ground (%s cleanup): %s" % (out["ground_stage"],
+                                           out["ground_las"]))
     print("%d ground points, %.2f per m2, radius %.2f m, %d cells kept"
           % (out["ground_points"], out["density"], out["search_radius_m"],
              out["cells_after_trim"]))

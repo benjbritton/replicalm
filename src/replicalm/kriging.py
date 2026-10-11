@@ -206,14 +206,15 @@ def krige_grid(x, y, z, grid, radius=20.0, max_points=32, min_points=3,
     # the same XY holds different elevations -- 0.1% of groups -- the lowest is
     # kept, because a ground surface cannot pass through two heights at one
     # place and the lower return is the ground candidate.
-    order = np.lexsort((z, y, x))
-    x, y, z = x[order], y[order], z[order]
-    first = np.ones(len(z), bool)
-    if len(z) > 1:
-        first[1:] = (x[1:] != x[:-1]) | (y[1:] != y[:-1])
-    n_dropped = int(len(z) - first.sum())
-    if n_dropped:
-        x, y, z = x[first], y[first], z[first]
+    #
+    # This used to be done here. It now lives in `preprocess.dedupe_xy`, because
+    # every solver needs it and none of them should have to know that: a
+    # thin-plate spline tried on the same data failed with a singular matrix for
+    # exactly this reason, while the fix sat inside the kriging path where it
+    # could not reach.
+    from .preprocess import dedupe_xy
+    x, y, z, dedupe_report = dedupe_xy(x, y, z, keep="lowest")
+    n_dropped = dedupe_report["dropped"]
     if len(z) < min_points:
         raise KrigingError("only %d distinct locations after de-duplication"
                            % len(z))

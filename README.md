@@ -210,7 +210,7 @@ The launcher holds no processing logic — every decision lives in
 `replicalm.pipeline`, so anything done through the window is reproducible from
 the command line.
 
-**Built:** `packaging\dist\Replicalm-1.0.0-setup.exe`, 1.15 GB, roughly 4 GB
+**Built:** `packaging\dist\Replicalm-2.0.0-setup.exe`, 1.16 GB, roughly 4 GB
 installed. The staged build is tested end to end — it processes a tile and
 writes a correctly projected raster from its own bundled PDAL, GDAL and PROJ.
 Rebuild with `.\build.ps1`; see [packaging/README.md](packaging/README.md).
@@ -221,12 +221,13 @@ Rebuild with `.\build.ps1`; see [packaging/README.md](packaging/README.md).
 |---|---|---|
 | ground filter | `filters.smrf`, one pass | second pass gave nothing across seven tiles and doubled runtime |
 | slope | 0.1584 | tan 9°, the source's pass-1 iteration angle |
-| threshold | 0.5 m baseline, 0.25 m clear and deep | the source's 3.0 m admits almost everything: 17.68% vs 10.34% error above 30 deg. 0.25 m was measured against 0.5 m in a 2x2 with Clear on and off; see open observation 10 |
-| working grid | 0.5 m | tied to the output cell; at 1.0 m steep faces terrace |
+| threshold | 0.25 m | the source's 3.0 m admits almost everything: 17.68% vs 10.34% error above 30 deg |
+| working grid | 1.0 m | validated over a whole tile: error against the reference fell 23% against 0.5 m, though steep terraced faces are slightly worse |
+| interpolator | global biharmonic | a minimum-curvature solve. The local spline it replaced lost about half the detail below a metre |
 | ELM filter | off | removed 0.00% of points on every window tested |
 | outlier filter | on | helps on one tile, hurts on another; sweep it per survey |
-| search radius | density-scaled, ≤ 20 m | the ceiling is the source's figure |
-| neighbors | 16 | binds before the radius does on well-covered ground |
+| search radius | 20 m | the source's figure, and the radius that defines the coverage footprint |
+| coverage edge | 20 m footprint, 21 m strip both axes | the footprint is the interpolator's reach; the strip is the flight-pass stitching seam |
 
 ## Relation to the published method
 
@@ -345,7 +346,7 @@ Cite the archived release rather than the repository, so the version is
 unambiguous. `CITATION.cff` in this repository carries the machine-readable
 form; GitHub renders it under "Cite this repository".
 
-Britton, Benjamin J. (2026). *Replicalm* (v1.0.0) [Software]. University of
+Britton, Benjamin J. (2026). *Replicalm* (v2.0.0) [Software]. University of
 Cincinnati. DOI: 10.5281/zenodo.23110738
 
 To cite the installer specifically rather than the source, use

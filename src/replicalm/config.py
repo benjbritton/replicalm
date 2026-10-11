@@ -44,8 +44,14 @@ what each parameter controls rather than from any published correspondence:
 
   TerraScan window 70 m
       the largest structure the filter will step over. SMRF's `window` is the
-      maximum morphological window and does the same job, so it carries across
-      directly.
+      maximum morphological window and does the same job, but it does not
+      carry across directly: measured on synthetic flat-topped boxes, SMRF's
+      progressive opening stops changing its labels above 32 m at a 0.5 m
+      working cell, so 70 and 32 produce identical ground and 70 costs two and
+      a half times the time. The configured pass therefore uses 32. Note the
+      sign of the parameter -- `window` is the largest object the opening will
+      STRIP, not the largest it will preserve, so reducing it below the
+      saturation point is conservative rather than aggressive.
   TerraScan iteration angle 9 deg / 12 deg
       how steeply the TIN may be pushed toward a candidate point. SMRF has no
       angular term; its `slope` is a rise-over-run tolerance. tan(9 deg) = 0.158
@@ -200,19 +206,97 @@ class ReplicalmConfig:
     # classify.py as a divergence, and the measurement now says the divergence
     # costs nothing to make complete.
     #
-    # `threshold_m` is 0.5, not the source's 3.0, and `cell_m` is 0.5 rather
-    # than 1.0. The source's figures scored 17.68% error above 30 degrees
-    # against 10.34% for these. `cell_m` is the one parameter the source cannot
-    # specify, since TerraScan has no SMRF working grid; left coarser than the
-    # output cell it quantizes steep faces into steps, with terracing of 5.06%
-    # at 1 m, 2.44% at 0.5 m and 0.68% at 0.25 m. Tie it to `dem_cell_m`.
+    # `threshold_m` is 0.25, not the source's 3.0. `cell_m` is 1.0 as of
+    # 2026-10-07, raised from 0.5, and the two measurements behind that
+    # disagree with each other -- both are recorded because the conflict is
+    # not resolved.
+    #
+    # AGAINST 1.0 m, measured earlier: left coarser than the output cell the
+    # working grid quantizes steep faces into steps, with terracing of 5.06%
+    # at 1 m, 2.44% at 0.5 m and 0.68% at 0.25 m.
+    #
+    # FOR 1.0 m, measured on the whole of l0s441, 55.2 million raw returns
+    # classified twice with nothing else changed, scored over 11.9 million
+    # cells against the TerraScan/Surfer reference:
+    #
+    #                 class-2      RMSE     MAE    p99   roughness    nugget
+    #     cell 0.50  17893142    0.1027  0.0459   21.0       1.055  0.001497
+    #     cell 1.00  17702632    0.0789  0.0420   20.5       1.015  0.001402
+    #
+    # RMSE falls 23.1%, MAE 8.3%, nugget 6.4%, and roughness moves from 1.055
+    # to 1.015 against the reference's 1.000, for 1.1% fewer ground returns.
+    # The same direction appeared first on eighteen 40 m windows, so this is a
+    # replication rather than a single result.
+    #
+    # The two are not necessarily contradictory: terracing is a defect of
+    # steep faces and the RMSE is a whole-tile average, so 1.0 m could be
+    # better overall and worse on scarps. That has not been tested. Revert by
+    # setting cell_m back to 0.5 here and in BASELINE.
+    #
+    # `scalar` is 0.00 and `window_m` is 32, both changed from the values this
+    # file carried until 2026-10-04 (1.25 and 70). The three parameters were
+    # measured together on two full tiles at opposite ends of the corpus --
+    # l0s426 at 0.86 ground returns per square metre and 40 degrees of mean
+    # slope, l0s395 at 4.24 and 8.5 -- against each tile's archive surface on
+    # the archive's own lattice.
+    #
+    # `scalar` multiplies the slope-dependent part of SMRF's elevation
+    # tolerance, so on a steep face the effective threshold is far above
+    # whatever `threshold_m` names. On l0s426 the classification arrived 0.30 m
+    # above the archive on flat ground and 0.73 m above it past 40 degrees
+    # before any cleanup ran, and over half of what it called ground stood
+    # more than half a metre above the lowest return in its own cell. Zeroing
+    # the term took cells within 25 cm of the archive from 17.3% to 44.4%. It
+    # was then run on l0s395, where the classification already sat at
+    # +0.0002 m and a change could only cost: it improved every measure there
+    # too, halving the bias past 40 degrees.
+    #
+    # `threshold_m` 0.25 was the single largest remaining gain: flat-ground
+    # bias on l0s426 from +0.1062 to +0.0059 m and cells within 25 cm from
+    # 58.5% to 64.6%, and on l0s395 a semivariance of 0.00667 against the
+    # archive's own 0.00663 -- the closest texture match any configuration has
+    # produced on that tile. It removes 22% of the ground returns 0.5 m kept.
+    #
+    # `window_m` 32 is a runtime change and not an accuracy one. On synthetic
+    # flat-topped boxes the progressive opening's effect saturates at 32 m with
+    # a 0.5 m working cell: from 32 to 128 m the labels are identical, and the
+    # three real clips swept over 6 to 70 m returned identical ground counts.
+    # It cut l0s395's classification from 4,692 s to 1,888 s. Below 32 m the
+    # parameter is not inert -- it strips objects narrower than itself -- so
+    # this is a ceiling to stop at, not a direction to continue in.
+    #
+    # `slope` stays at tan 9 degrees. Raising it to tan 25 recovered 21% more
+    # ground returns on l0s426, exactly as a clip-level test predicted, and
+    # cost 10.9 points of accuracy doing it: the recovered returns were canopy
+    # that happened to be the only return in its cell, which is the error a
+    # per-cell test structurally cannot see. Measured in isolation and
+    # rejected.
     reset_classification: bool = True
     passes: list = field(default_factory=lambda: [
-        GroundPass(slope=_slope_from_angle(9.0), threshold_m=0.5, cell_m=0.5,
-                   reuse_ground=False,
+        GroundPass(slope=_slope_from_angle(9.0), threshold_m=0.25, cell_m=1.0,
+                   scalar=0.0, window_m=32.0, reuse_ground=False,
                    stands_in_for="TerraScan pass 1: 70 m, 88 deg, 9 deg, 3 m; "
                                  "pass 2 dropped, see the note above"),
     ])
+
+    # Which ground classifier runs.
+    #
+    # "smrf" is the locked baseline: the single morphological pass defined in
+    # `passes` above, which is what every published Replicalm figure was built
+    # with and what the installer ships.
+    #
+    # "tsr" is `replicalm.ground_tsr`, which composes a conservative opening,
+    # a permissive curvature test and an adjudication stage between them. It
+    # was built to reproduce an NCALM TerraScan/Surfer ground population from
+    # raw returns and is calibrated against one; see that module's docstring
+    # for the measured basis of every default and for its operational limits.
+    # It is opt-in because the baseline is locked, not because it scores worse.
+    #
+    # `passes` is ignored under "tsr": the routine carries its own stage
+    # parameters so that one object describes one classifier, rather than two
+    # places having to agree.
+    ground_engine: str = "smrf"          # smrf | tsr
+    ground_tsr_overrides: dict = field(default_factory=dict)
 
     # height above ground, step 6
     hag_low_cut_m: float = NCALM_TERRASCAN["hag_low_cut_m"]
@@ -241,6 +325,20 @@ class ReplicalmConfig:
     clean_vegetation: bool = True
     clean_patch_m: float = 0.75
     clean_height_m: float = 0.20
+    # Measure the height against a plane fitted to the neighbourhood instead of
+    # against the 10th percentile of its raw elevations. The percentile sits
+    # downhill on a slope, so the published rule removes ground for being on an
+    # incline: measured on l0s395 it moves the surface not at all below 9.5
+    # degrees and by 12 cm beyond 40, with 99% of the movement downward. The
+    # plane cancels the terrain and leaves what stands above it. Off by default
+    # -- it is a departure from the source method, not a translation of it.
+    clean_slope_aware: bool = False
+    # Radius the plane is fitted over, when `clean_slope_aware` is set. Separate
+    # from `clean_patch_m` because the two do different jobs: the threshold wants
+    # a small neighbourhood, while the plane must sit on the ground and will be
+    # tilted onto itself by a clump of scrub wider than the disc it is fitted
+    # over. None means use `clean_patch_m`.
+    clean_plane_patch_m: float = None
     clean_percentile: float = 10.0
 
     # export, step 7
@@ -268,7 +366,73 @@ class ReplicalmConfig:
     # defaults are measurements rather than preferences. They were chosen on
     # South_GLAS_l0s395 and should be re-checked on unfamiliar terrain, which is
     # what `replicalm.calibrate` is for.
-    interpolator: str = "kriging"        # kriging | cloudcompare
+    # WHICH SURFACE ENGINE RUNS
+    #
+    # "kriging" estimates each cell as a weighted average of its neighbours
+    # under second-order stationarity. Where ground returns arrive in clumps
+    # separated by canopy voids the weights concentrate on the nearest clump and
+    # the surface relaxes toward the local mean between them, which on sloped
+    # ground reads as curvilinear grooves. No neighbourhood, nugget or cell size
+    # removes that: the mechanism is in the estimator, not its parameters.
+    #
+    # "spline" is minimum curvature with tension, which has no local mean to
+    # relax toward. Measured on Centro GLAS l0s441, interior cells, identical
+    # accepted ground and grid, against a TerraScan/Surfer reference of 21.7
+    # degrees at the 99th percentile of local slope: kriging 24.1, spline 20.9
+    # at tension 0.03. See `replicalm.spline` for the tension response.
+    #
+    # Tension 0.03 is the operating point. The response flattens below it --
+    # 0.02 measures 21.1 against 0.03's 20.9 -- and 0.03 carries the smallest
+    # local excursions of any surface compared, the reference included, so it is
+    # not over-smoothing to reach that figure.
+    # "biharmonic" is the production engine as of 2026-10-10.
+    #
+    # The local spline that held this slot approximates: a smoothing term of
+    # 1e-2 over 48 neighbours lets the surface sit off the observations, and
+    # measured against the delivered archive on Centro GLAS l0s454 it retained
+    # 0.505 of the reference's coherent detail below 1 m and 0.607 at 1.5 m.
+    # The global minimum-curvature solve retains 0.914 and 0.972 on the same
+    # tile, halves the error inside the boundary -- 0.0964 m to 0.0513 m at a
+    # 25 m setback -- and runs in a third of the time.
+    #
+    # It is the Surfer half of the reference chain and it had been in the tree
+    # since a304e8f without being reachable from here, so every release before
+    # 1.4.0 shipped the local spline while the measurements quoted against the
+    # archive came from this one.
+    # Edge fixing, back ON as of 2026-10-10 with the method corrected.
+    #
+    # Two stages now, with separate causes. The footprint keeps cells within
+    # the interpolator's reach of a ground return -- `search_radius_m`, since
+    # a cell beyond it was extrapolated rather than interpolated -- closes
+    # each area into a polygon with no interior rings, and fills any void
+    # inside the survey with a continuous surface rather than a sentinel.
+    # The across-track strip then removes the flight-pass stitching seam.
+    #
+    # It replaces a 4 m disc union that drew the boundary as overlapping
+    # circles with detached islands, and a blocked-solver artefact that cut
+    # sawtooth teeth at 150 m. Measured on Centro GLAS l0s454: footprint
+    # +0.5% of the archive's area, raggedness 1.91 against 1.89, one polygon.
+    edge_fix_enabled: bool = True
+
+    # Overrides the footprint radius. None means use `search_radius_m`, which
+    # is what the reference's own footprint corresponds to.
+    footprint_radius_m: float = None
+
+    # The along-track ends, trimmed as well as the sides. The sides carry the
+    # flight-pass stitching seam; the ends carry the end-of-pass taper, where
+    # the scan narrows and the solver has support on one side only. The
+    # reference treats both at the same width -- the archive is inset exactly
+    # 42 rows, 21.0 m, at north and south as well as east and west. Set to 0
+    # to leave the ends alone.
+    edge_strip_ends_m: float = 21.0
+
+    interpolator: str = "biharmonic"     # kriging | spline | biharmonic
+    biharmonic_core_m: float = 150.0     # solved domain, declared in
+    biharmonic_buffer_m: float = 20.0    # metres so it is resolution
+    biharmonic_pool_sigma_m: float = 0.25  # independent
+    spline_tension: float = 0.03         # inverse metres; see replicalm.spline
+    spline_neighbours: int = 48          # observations per local solve
+    spline_smoothing: float = 1e-2       # Tikhonov, as a fraction of the kernel
     variogram_model: str = "spherical"   # spherical | exponential | linear
     variogram_fit_lag_m: float = 5.0     # lag out to which the model is fitted
 
@@ -282,13 +446,50 @@ class ReplicalmConfig:
     # measurement. It is kept in kriging.py for terrain that does have a range,
     # and is not used here.
     #
-    # A fixed radius is not the answer either, because it means different things
-    # at different densities. At 3 points per square metre `max_points` binds
-    # long before a 20 m radius does and 5 m and 20 m give identical results; at
-    # 8 points per square metre the same 20 m radius packed the neighbourhood
-    # tightly enough to lose matrix rank, putting 77 to 88% of l0s444's cells
-    # onto the inverse-distance fallback. `radius_for_density` sets it from the
-    # distance at which `max_points` neighbours are actually found.
+    # A fixed radius appeared not to be the answer either, because it means
+    # different things at different densities. At 3 points per square metre
+    # `max_points` binds long before a 20 m radius does and 5 m and 20 m give
+    # identical results; at 8 points per square metre the same 20 m radius
+    # packed the neighbourhood tightly enough to lose matrix rank, putting 77 to
+    # 88% of l0s444's cells onto the inverse-distance fallback.
+    #
+    # That measurement was taken at `max_points` 16, and the cause was the
+    # point count, not the radius. Sixteen neighbours at 8 points per square
+    # metre are all inside 0.79 m whatever the radius is set to -- nearly
+    # coincident, so the covariance matrix loses rank. Sixty-four reach 1.58 m
+    # at the same density, twice the span, and the conditioning improves
+    # accordingly: moving to 64 inside a fixed 20 m took the fallback from
+    # 1.18% of cells to 0.53% on l0s426 and from 0.23% to 0.10% on l0s395. The
+    # radius was never the problem.
+    #
+    # So the neighbourhood is now the source's own: up to 64 points, minimum 1,
+    # inside a fixed 20 m (Estrada-Belli et al. 2025 supplementary,
+    # GLiHT_Methods_Materials section 5.2), which is also what the `baseline`
+    # profile already used. Measured against each tile's archive surface on the
+    # archive's lattice, with classification held constant:
+    #
+    #   l0s426, 1.08 returns per m2   semivariance at one cell 0.14876 -> 0.12997
+    #   (sparse, steep)               against an archive of 0.10984, so 35% above
+    #                                 it to 18%; coverage 86.6% -> 90.9%;
+    #                                 elevation unchanged within 6 mm
+    #   l0s395, 4.47 returns per m2   semivariance 0.00667 -> 0.00668 against an
+    #   (dense, gentle)               archive of 0.00663, i.e. no smoothing where
+    #                                 there was nothing to gain; three of four
+    #                                 slope bands to exactly zero, the fourth
+    #                                 +0.0128 -> +0.0082 m; coverage 99.1% ->
+    #                                 99.6%
+    #
+    # Better on the sparse tile, neutral-to-better on the dense one, so this is
+    # not density-conditional. It costs 7 to 9 times the interpolation -- 2,400
+    # to 4,700 s per tile against 350 to 630 s -- which is a scheduling cost and
+    # not a methodological one.
+    #
+    # NOT YET MEASURED: the densest tiles. l0s444 at 8.18 returns per m2 is
+    # where the rank failure above was found, and 64 points reach only 1.58 m
+    # there. The mechanism says conditioning should improve, and both measured
+    # tiles agree, but 8 points per square metre is an extrapolation until a run
+    # confirms it. `radius_for_density` is kept in place for that case and for
+    # surveys whose density differs from this one.
     #
     # The source's documented 20 m is preserved in NCALM_TERRASCAN and is the
     # ceiling here, so nothing ever searches further than the method specifies.
@@ -298,14 +499,50 @@ class ReplicalmConfig:
     # fold residual and 2.3x the compute. The Deep profile sets it.
     cell_factor: float = 1.0
 
-    search_radius_m: float = None        # None scales it from ground density
-    search_radius_mode: str = "density"  # density | variogram | fixed
+    # 64 POINTS INSIDE A FIXED 20 M, WHICH IS THE SOURCE'S OWN FIGURE
+    #
+    # A smaller neighbourhood puts spurious narrow ridges and grooves on slopes.
+    # On Centro GLAS l0s441 the 99th percentile of local slope is 22.9 and 22.0
+    # degrees in the TerraScan/Surfer rasters at 0.33 and 0.50 m, and 32.9
+    # degrees in a Replicalm raster built with 16 points at a density-derived
+    # radius of 3.73 m. Rebuilt from the same classified ground with 64 points
+    # inside 20 m it is 23.9 degrees, and the inverse-distance fallback falls
+    # from 0.65% of cells to 0.12%. In a plain hillshade the difference is a
+    # network of thin dark incisions across every flank, which is what makes the
+    # hillocks read as inverted, and they are gone at 20 m.
+    #
+    # The defect is NOT the vegetation cleanup: with the cleanup off the 99th
+    # percentile is 33.2 degrees, marginally worse. It is not the G1 blend
+    # either, because a plain hillshade shows it. It is the neighbourhood.
+    #
+    # HOW THIS WAS NEARLY MISSED, which is the part worth keeping
+    #
+    # On 2026-10-05 the default was set to 16 points at a density-derived radius
+    # on the grounds that 64 inside 20 m "bought half a point of coverage and a
+    # tenth of a percent of texture for nine times the interpolation". Those
+    # measures -- median displacement by slope band, cell-scale semivariance,
+    # share of cells within 0.25 m, coverage -- all average over a whole tile. A
+    # fault occupying about 1% of cells and arranged in thin lines moves none of
+    # them appreciably, and their silence was read as absence. It was visible in
+    # the imagery throughout.
+    #
+    # Evaluate a candidate neighbourhood on a tail statistic as well as a
+    # central one. The 99th percentile of local slope against the reference's is
+    # the cheapest one that sees this.
+    #
+    # These four values move together and are locked per profile for that
+    # reason: 64 points inside a radius derived for 16 would be packed tightly
+    # enough to lose matrix rank, and 16 inside a fixed 20 m was measured doing
+    # exactly that on dense data. 16 with a density-derived radius remains
+    # selectable for speed, and costs the slopes.
+    search_radius_m: float = NCALM_TERRASCAN["kriging_search_radius_m"]
+    search_radius_mode: str = "fixed"    # density | variogram | fixed
     search_radius_factor: float = 4.0    # multiplier on the k-neighbour spacing
     search_radius_floor_m: float = 3.0
     search_radius_ceiling_m: float = NCALM_TERRASCAN["kriging_search_radius_m"]
-    max_points: int = 16                 # the real control on neighbourhood
+    max_points: int = 64                 # the real control on neighbourhood
                                          # size; see the note above
-    min_points: int = 3                  # below this a cell is left as nodata
+    min_points: int = 1                  # below this a cell is left as nodata
     dem_cell_m: float = NCALM_TERRASCAN["dem_cell_m"]
 
     # The one-sided fringe is one search radius wide, because that is how far a
@@ -317,6 +554,50 @@ class ReplicalmConfig:
     erode_m: float = None                # None follows the search radius
     erode_factor: float = 1.0
     erode_cells: int = 0                 # kept for callers that set it directly
+
+    # How far a cell may sit from the nearest accepted ground return and still
+    # be written. Morphological erosion of the coverage mask cannot express
+    # this: it trims inward from whatever the interpolator chose to fill, so an
+    # engine that extrapolates keeps a fringe no erosion depth reaches, and an
+    # engine that does not loses good ground.
+    #
+    # 4.0 m is measured, not chosen. On Centro GLAS l0s441, distance to the
+    # nearest return was thresholded across 1 to 7 m and scored against the
+    # TerraScan/Surfer extent for the same tile:
+    #
+    #     radius   1.5     2.5     3.0     4.0     5.0     7.0
+    #     IoU      0.9422  0.9737  0.9782  0.9782  0.9749  0.9655
+    #     lost     5.08%   1.54%   0.81%   0.33%   0.15%   0.04%
+    #     fringe   0.77%   1.13%   1.40%   1.86%   2.37%   3.42%
+    #
+    # 3.0 and 4.0 tie on agreement; 4.0 keeps 99.67% of the reference's cells
+    # against 3.0's 99.19%, for 0.46% more fringe. Set to None to skip the
+    # support mask and trim by erosion alone, which is the pre-1.1 behaviour.
+    #
+    # Interior voids are filled before the mask is applied. Ground returns are
+    # sparse under canopy, so a bare distance threshold punches holes through
+    # the middle of good terrain, and a hole inside the survey is not an edge.
+    edge_fix_m: float = 4.0
+
+    # The across-track strip, which is the edge treatment the reference
+    # products themselves use. From the G-LiHT reprocessing work: where
+    # adjacent flight passes overlap and are merged, the ground classification
+    # at the overlap differs from the interior and leaves a seam about 21 m
+    # wide down both sides of every transect. `clean_las_edges.py` removes
+    # STRIP_M = 21.0 m per side; `mask_dem_edges.py` removes 64 px at 0.33 m,
+    # which is the same 21 m.
+    #
+    # This replaces the morphological erosion rather than adding to it, and it
+    # is the less aggressive of the two in the direction that matters: erosion
+    # takes a ring, so it strips the along-track ends where there is no seam,
+    # and it widens every interior void by its own depth. The strip touches
+    # only the first and last run of each line.
+    #
+    # `edge_axis` follows the G-LiHT naming -- _GLAS_ flies north-south so its
+    # seams are left and right, _NFI_ flies east-west so they are top and
+    # bottom. None infers from the name, then from the aspect ratio.
+    edge_strip_m: float = 21.0
+    edge_axis: str = None                # "x" | "y" | None to infer
 
     # the documented figure, kept so the source is never lost even though the
     # default no longer uses it directly
@@ -372,38 +653,51 @@ class ReplicalmConfig:
 # steep ground, and all three were wrong.
 
 BASELINE = {
-    "locked": "2026-09-23",
+    "locked": "2026-10-07",
     "algorithm": "smrf",
     "passes": 1,
     "slope": 0.1584,            # tan 9 deg, the source's pass-1 iteration angle
-    "cell_m": 0.5,
+    "cell_m": 1.0,              # raised 2026-10-07; see the note above
+    "scalar": 0.0,              # the slope-coupled tolerance, measured off
+    "window_m": 32.0,           # saturated: PDAL's opening stops responding
+                                # above about 8 m on this data, so 8, 32, 100
+                                # and 200 give identical output
     "remove_low_noise": False,  # ELM: inert on this data, 0.00% removed
     "remove_outliers": True,    # tile-dependent, see the note above
     "clean_height_m": 0.20,
     "clean_patch_m": 0.75,
-    "search_radius_mode": "density",
     "search_radius_ceiling_m": 20.0,
-    "max_points": 16,
     "dem_cell_m": 1.0,
 
-    # Two parameters vary by profile rather than being fixed for every run, so
-    # they are locked per profile instead of globally. Everything above is the
-    # same whichever profile runs.
+    # The interpolation neighbourhood varies by profile, so it is locked per
+    # profile rather than globally. The four values move together: 64 points
+    # inside a radius derived for 16 would be packed tightly enough to lose
+    # matrix rank, and 16 inside a fixed 20 m was measured doing exactly that
+    # on dense data. Locking them separately would allow a combination neither
+    # was measured at, and the window reports any mismatch as drift -- which it
+    # did, on a default run, when the shipped default and this lock disagreed.
     "profiles": {
-        "ncalm":    {"threshold_m": 0.50, "clean_vegetation": True,
-                     "max_points": 16, "min_points": 3},
-        # The replication target uses the source's own neighbourhood: 20 m
-        # radius, up to 64 points, minimum 1 (Estrada-Belli et al. 2025
-        # supplementary; GLiHT_Methods_Materials section 5.2). Replicalm's 16
-        # and 3 were chosen on their own merits and are kept for the other
-        # profiles, but a configuration whose purpose is fidelity should not
+        "ncalm":    {"threshold_m": 0.25, "clean_vegetation": True,
+                     "max_points": 64, "min_points": 1,
+                     "search_radius_mode": "fixed", "search_radius_m": 20.0},
+        # Every profile uses the source's own neighbourhood: 20 m radius, up to
+        # 64 points, minimum 1 (Estrada-Belli et al. 2025 supplementary;
+        # GLiHT_Methods_Materials section 5.2). The replication target always
+        # did, because a configuration whose purpose is fidelity should not
         # differ from its target in the size of the neighbourhood it averages.
-        "baseline": {"threshold_m": 0.50, "clean_vegetation": False,
-                     "max_points": 64, "min_points": 1},
-        "clear":    {"threshold_m": 0.50, "clean_vegetation": True,
-                     "max_points": 16, "min_points": 3},
-        "deep":     {"threshold_m": 0.50, "clean_vegetation": True,
-                     "max_points": 16, "min_points": 3},
+        # The others were briefly set to 16 at a density-derived radius on
+        # 2026-10-05 and put back the next day, when a smaller neighbourhood was
+        # found to cut spurious narrow grooves into every slope -- see the note
+        # at `search_radius_m`, and note what it cost to find.
+        "baseline": {"threshold_m": 0.25, "clean_vegetation": False,
+                     "max_points": 64, "min_points": 1,
+                     "search_radius_mode": "fixed", "search_radius_m": 20.0},
+        "clear":    {"threshold_m": 0.25, "clean_vegetation": True,
+                     "max_points": 64, "min_points": 1,
+                     "search_radius_mode": "fixed", "search_radius_m": 20.0},
+        "deep":     {"threshold_m": 0.25, "clean_vegetation": True,
+                     "max_points": 64, "min_points": 1,
+                     "search_radius_mode": "fixed", "search_radius_m": 20.0},
     },
 }
 
@@ -436,13 +730,12 @@ def verify_baseline(cfg=None, profile=None):
                    % (len(cfg.passes), BASELINE["passes"]))
     if cfg.passes:
         p = cfg.passes[0]
-        for k in ("algorithm", "slope", "cell_m"):
+        for k in ("algorithm", "slope", "cell_m", "scalar", "window_m"):
             if getattr(p, k) != BASELINE[k]:
                 bad.append("%s: %r, baseline %r"
                            % (k, getattr(p, k), BASELINE[k]))
     for k in ("remove_low_noise", "remove_outliers", "clean_height_m",
-              "clean_patch_m", "search_radius_mode",
-              "search_radius_ceiling_m"):
+              "clean_patch_m", "search_radius_ceiling_m"):
         if getattr(cfg, k) != BASELINE[k]:
             bad.append("%s: %r, baseline %r" % (k, getattr(cfg, k), BASELINE[k]))
     if profile:
@@ -453,7 +746,11 @@ def verify_baseline(cfg=None, profile=None):
         if cfg.clean_vegetation != want["clean_vegetation"]:
             bad.append("clean_vegetation: %r, %s baseline %r"
                        % (cfg.clean_vegetation, profile, want["clean_vegetation"]))
-        for k in ("max_points", "min_points"):
+        # The neighbourhood is four values that only make sense together, and
+        # it differs by profile: the replication target takes the source's 64
+        # inside a fixed 20 m, the others ship 16 with the radius from density.
+        for k in ("max_points", "min_points", "search_radius_mode",
+                  "search_radius_m"):
             if getattr(cfg, k) != want[k]:
                 bad.append("%s: %r, %s baseline %r"
                            % (k, getattr(cfg, k), profile, want[k]))
@@ -487,18 +784,46 @@ PRESETS = {
     # l8s431) and Clear still finds 6 to 12% afterwards. Together they put bias
     # within 3.3 mm of zero on all three tiles, the best of any arm, with no
     # sign of the overshoot that compounding two removals might have produced.
-    "clear": ReplicalmConfig(),
+    #
+    # The cleanup measures against a fitted plane rather than the 10th
+    # percentile of a disc, because the percentile sits at the downhill edge of
+    # that disc and so removes ground for being on a slope: on synthetic bare
+    # ground it took 90% of it at 25 degrees and 97% at 40. On l0s426 the
+    # percentile rule removed 65% of the classified ground and the plane rule
+    # at 1.20 m removes 14%, while landing closer to the archive on every
+    # measure -- cells within 25 cm 64.6% against 59.9%, and semivariance
+    # 0.14312 against 0.15292 on an archive of 0.10984. The 1.20 m fit radius
+    # was swept over 0.75 to 2.00 m on l0s395 and confirmed on l3s457 and
+    # l0s426; it is separate from `clean_patch_m` because the threshold wants a
+    # small neighbourhood and the plane has to BE the local surface, and a
+    # clump of scrub wider than the disc it is fitted over tilts the plane onto
+    # itself and escapes.
+    #
+    # Worth knowing before this is taken as settled: at 4.24 ground returns per
+    # square metre the cleanup has become nearly redundant. On l0s395 the
+    # classification alone now matches the best cleanup arm at 99.9% of cells
+    # within 25 cm and sits closer to the archive's texture than it does
+    # (0.00667 against 0.00633, archive 0.00663), so adding the plane rule
+    # there pushes the surface slightly below the reference rather than onto
+    # it. It earns its place at 0.86 returns per square metre and not at 4.24,
+    # which argues for making it density-conditional rather than a fixed
+    # property of the profile.
+    "clear": ReplicalmConfig(clean_slope_aware=True,
+                             clean_plane_patch_m=1.20),
 
     # The translation alone, with nothing removed beyond what the source method
     # removes. This is what the published comparison figures are measured
     # against, and the right choice on terrain where the cleanup threshold has
     # not been checked.
     "baseline": ReplicalmConfig(clean_vegetation=False,
-                                max_points=64, min_points=1),
+                                max_points=64, min_points=1,
+                                search_radius_mode="fixed",
+                                search_radius_m=20.0),
 
     # Clear on a grid finer than the point spacing. The extra resolution is for
     # rendering, not for accuracy -- see cell_factor.
-    "deep": ReplicalmConfig(cell_factor=0.7),
+    "deep": ReplicalmConfig(cell_factor=0.7, clean_slope_aware=True,
+                            clean_plane_patch_m=1.20),
     "ncalm_csf": ReplicalmConfig(passes=[
         GroundPass(algorithm="csf", csf_rigidness=2, csf_threshold_m=0.5,
                    stands_in_for="TerraScan pass 1, via cloth simulation"),

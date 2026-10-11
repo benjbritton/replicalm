@@ -67,8 +67,8 @@ def _tile_key(path):
 
 def _one(job):
     """Process a single tile in a worker. Returns a record, never raises."""
-    (path, out_dir, preset, cell_m, make_g1, keep_ground, rvt_script,
-     threads) = job
+    (path, out_dir, preset, cell_m, make_g1, keep_ground, interpolation,
+     threads, ground_stage) = job
     # Set before the first numpy import in this process, which is why it is here
     # and not at module level: LAPACK and the neighbour query read these once.
     # Left at one, N workers on a big machine use N cores of it -- see the note
@@ -91,9 +91,17 @@ def _one(job):
         from .config import PRESETS
         from . import pipeline
         cfg = PRESETS[preset]
+        if interpolation == "fast":
+            from dataclasses import replace
+            cfg = replace(cfg, max_points=16, min_points=3,
+                          search_radius_mode="density", search_radius_m=None)
+        elif interpolation == "published":
+            from dataclasses import replace
+            cfg = replace(cfg, max_points=64, min_points=1,
+                          search_radius_mode="fixed", search_radius_m=20.0)
         out = pipeline.process(path, out_dir, cfg=cfg, cell_m=cell_m,
                                make_g1=make_g1, keep_ground=keep_ground,
-                               rvt_script=rvt_script, progress=None)
+                               ground_stage=ground_stage, progress=None)
         peak = None
         if _proc is not None:
             try:
@@ -176,8 +184,8 @@ def _budget_bytes(explicit_gb=None):
 
 
 def run(las_paths, out_dir, preset="clear", workers=None, cell_m=None,
-        make_g1=False, keep_ground=False, rvt_script=None, redo=False,
-        manifest=None, verbose=True, memory_gb=None):
+        make_g1=True, keep_ground=False, interpolation=None, redo=False,
+        manifest=None, verbose=True, memory_gb=None, ground_stage="after"):
     """Process every tile in `las_paths`. Returns the manifest dict."""
     os.makedirs(out_dir, exist_ok=True)
     manifest = manifest or os.path.join(out_dir, "batch_manifest.json")
@@ -233,7 +241,8 @@ def run(las_paths, out_dir, preset="clear", workers=None, cell_m=None,
                 pending.pop(0)
                 committed += charge[nxt]
                 fut = pool.submit(_one, (nxt, out_dir, preset, cell_m, make_g1,
-                                         keep_ground, rvt_script, threads))
+                                         keep_ground, interpolation, threads,
+                                         ground_stage))
                 running[fut] = nxt
             finished, _ = cf.wait(running, return_when=cf.FIRST_COMPLETED)
             for fut in finished:
@@ -283,6 +292,32 @@ def run(las_paths, out_dir, preset="clear", workers=None, cell_m=None,
     return records
 
 
+def collect_inputs(items):
+    """Files, directories and glob patterns -> the point clouds they name.
+
+    Shared with the desktop front end, which offers "Add file(s)" and "Add
+    folder" and must expand them exactly as the command line does. A front end
+    with its own copy of this is a front end that finds a different set of
+    tiles than a script does.
+
+    Directories are searched recursively. A pattern is globbed recursively too,
+    so a `**` in it means what it looks like it means -- without that,
+    "root/**/*.las" quietly matches nothing and a run exits having done no
+    work. Order is preserved and duplicates are dropped, so adding a folder and
+    then one file inside it processes that file once.
+    """
+    paths = []
+    for item in items:
+        item = str(item)
+        if os.path.isdir(item):
+            paths += sorted(glob.glob(os.path.join(item, "**", "*.la[sz]"),
+                                      recursive=True))
+        else:
+            hits = sorted(glob.glob(item, recursive=True))
+            paths += hits if hits else [item]
+    return [q for q in dict.fromkeys(paths) if os.path.isfile(q)]
+
+
 def main(argv=None):
     from .config import PRESETS
     p = argparse.ArgumentParser(
@@ -297,10 +332,30 @@ def main(argv=None):
                    help="worker processes (default: half the cores, max 8)")
     p.add_argument("--cell", type=float, default=None,
                    help="output cell size in metres (default: from density)")
-    p.add_argument("--g1", action="store_true", help="also build the G1 image")
+    p.add_argument("--g1", dest="g1", action="store_true",
+                   default=True, help="build the G1 image (default)")
+    p.add_argument("--no-g1", dest="g1", action="store_false",
+                   help="skip the G1 image and write only the DEM")
     p.add_argument("--keep-ground", action="store_true",
-                   help="keep the classified point cloud for each tile")
-    p.add_argument("--rvt-script", default=None)
+                   help="save the ground returns as LAZ for each tile")
+    p.add_argument("--ground-stage", choices=("after", "before"),
+                   default="after",
+                   help="which ground to save: 'after' the cleanup, the surface "
+                        "the DEM was built from (default), or 'before' it, "
+                        "which is where re-deriving the cleanup starts")
+    # Resolution in the units people ask for it in; the conversion is
+    # quadratic and is a common place to be out by a factor of two.
+    p.add_argument("--pixels-per-m2", type=int, default=None, metavar="N",
+                   choices=(1, 4, 9, 16, 25),
+                   help="output resolution as pixels per square metre: 1 is "
+                        "1.00 m cells, 4 is 0.50 m, 9 is 0.33 m, 16 is 0.25 m, "
+                        "25 is 0.20 m. An alternative to --cell")
+    p.add_argument("--interpolation", choices=("published", "fast"),
+                   default=None,
+                   help="published: 64 points within a fixed 20 m, the "
+                        "source's neighbourhood and the profile default. "
+                        "fast: 16 points with the radius from density, 7-9x "
+                        "quicker to interpolate")
     p.add_argument("--memory-gb", type=float, default=None,
                    help="memory the run may commit at once "
                         "(default: three quarters of installed RAM)")
@@ -308,23 +363,21 @@ def main(argv=None):
                    help="reprocess tiles already recorded as done")
     a = p.parse_args(argv)
 
-    paths = []
-    for item in a.inputs:
-        if os.path.isdir(item):
-            paths += sorted(glob.glob(os.path.join(item, "**", "*.la[sz]"),
-                                      recursive=True))
-        else:
-            # recursive, so a ** in the pattern means what it looks like it
-            # means. Without it "root/**/*.las" quietly matches nothing and the
-            # run exits having done no work.
-            hits = sorted(glob.glob(item, recursive=True))
-            paths += hits if hits else [item]
-    paths = [q for q in dict.fromkeys(paths) if os.path.isfile(q)]
+    paths = collect_inputs(a.inputs)
     if not paths:
         p.error("no LAS or LAZ files matched")
 
-    run(paths, a.out, preset=a.preset, workers=a.workers, cell_m=a.cell,
-        make_g1=a.g1, keep_ground=a.keep_ground, rvt_script=a.rvt_script,
+    cell = a.cell
+    if a.pixels_per_m2 is not None:
+        if a.cell is not None:
+            p.error("give --cell or --pixels-per-m2, not both")
+        cell = (1.0 / a.pixels_per_m2) ** 0.5
+        print("resolution %d px/m2 is a %.4f m cell" % (a.pixels_per_m2, cell))
+
+    run(paths, a.out, preset=a.preset, workers=a.workers, cell_m=cell,
+        make_g1=a.g1, keep_ground=a.keep_ground,
+        interpolation=a.interpolation,
+        ground_stage=a.ground_stage,
         redo=a.redo, memory_gb=a.memory_gb)
     return 0
 

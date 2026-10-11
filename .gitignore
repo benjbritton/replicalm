@@ -76,3 +76,9 @@ Replicalm_post_specks_v1.docx
 # Internal publication log: a record of this workstation's process, not
 # documentation of the software.
 STATUS.md
+
+# Development test outputs: 5.6 GB of derived rasters, point sets and renders
+# on local disks. Not published data. Everything needed to regenerate them is
+# tracked under experiments/, and experiments/ground_tsr/README.md says how.
+# Listed explicitly because .npy and .png are not otherwise ignored.
+test100526/
