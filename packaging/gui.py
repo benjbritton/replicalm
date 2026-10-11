@@ -133,7 +133,10 @@ class App(tk.Tk):
         self.neighbourhood = tk.StringVar(value=NEIGHBOURHOODS[0][0])
         self.threshold = tk.StringVar(value="auto")
         self.reason = tk.StringVar()
-        self.g1 = tk.BooleanVar(value=False)
+        # The G1 composite is the point of the tool for most users, so
+        # it is on unless they turn it off. It adds a couple of minutes
+        # to a tile; the elevation model is written either way.
+        self.g1 = tk.BooleanVar(value=True)
         self.keep = tk.BooleanVar(value=False)
         # Which ground to save. "after" is the surface the DEM was built from;
         # "before" is the filter's own output, which is where re-deriving the
@@ -189,7 +192,7 @@ class App(tk.Tk):
                      state="readonly",
                      values=tuple(label for label, _ in RESOLUTIONS)).pack(
                          side="left", padx=(6, 18))
-        ttk.Checkbutton(res, text="Also build the G1 image",
+        ttk.Checkbutton(res, text="Build the G1 image",
                         variable=self.g1).pack(side="left")
 
         nb = ttk.Frame(frm)

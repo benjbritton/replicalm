@@ -492,7 +492,10 @@ def main(argv=None):
                    help="output resolution as pixels per square metre: 1 is "
                         "1.00 m cells, 4 is 0.50 m, 9 is 0.33 m, 16 is 0.25 m, "
                         "25 is 0.20 m. An alternative to --cell")
-    p.add_argument("--g1", action="store_true", help="also build the G1 image")
+    p.add_argument("--g1", dest="g1", action="store_true",
+                   default=True, help="build the G1 image (default)")
+    p.add_argument("--no-g1", dest="g1", action="store_false",
+                   help="skip the G1 image and write only the DEM")
     p.add_argument("--keep-ground", action="store_true",
                    help="save the ground returns as LAZ beside the DEM")
     p.add_argument("--slope-aware-cleanup", action="store_true",

@@ -184,7 +184,7 @@ def _budget_bytes(explicit_gb=None):
 
 
 def run(las_paths, out_dir, preset="clear", workers=None, cell_m=None,
-        make_g1=False, keep_ground=False, interpolation=None, redo=False,
+        make_g1=True, keep_ground=False, interpolation=None, redo=False,
         manifest=None, verbose=True, memory_gb=None, ground_stage="after"):
     """Process every tile in `las_paths`. Returns the manifest dict."""
     os.makedirs(out_dir, exist_ok=True)
@@ -332,7 +332,10 @@ def main(argv=None):
                    help="worker processes (default: half the cores, max 8)")
     p.add_argument("--cell", type=float, default=None,
                    help="output cell size in metres (default: from density)")
-    p.add_argument("--g1", action="store_true", help="also build the G1 image")
+    p.add_argument("--g1", dest="g1", action="store_true",
+                   default=True, help="build the G1 image (default)")
+    p.add_argument("--no-g1", dest="g1", action="store_false",
+                   help="skip the G1 image and write only the DEM")
     p.add_argument("--keep-ground", action="store_true",
                    help="save the ground returns as LAZ for each tile")
     p.add_argument("--ground-stage", choices=("after", "before"),
