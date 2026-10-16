@@ -8,21 +8,32 @@ It reproduces the NCALM processing workflow documented in the Estrada-Belli et
 al. 2025 supplementary materials, using only open software. The published
 method needs TerraScan and Golden Surfer; this needs neither.
 
-**Its first purpose is reproducibility.** The defaults are the configuration
-used to produce the published results, and every one of them is listed and
-explained below so you can change any of them deliberately for your own work.
+**What it is for.** Replicalm did not exist when the terrain products for our
+study of the G-LiHT Yucatán surveys were made, and it was not used to make
+them: the DEMs in which the Q2000 model detected 57,181 candidate Maya
+structures were produced with TerraScan and Golden Surfer. Replicalm
+replicates that method with open-source software. It is provided as open
+source for two purposes: so that interested researchers can reproduce our
+method, and so that anyone can use a free tool to ground-filter raw LAS/LAZ
+point clouds, produce filtered DEMs, and make GeoTIFF visualizations of lidar
+data.
+
+The defaults follow the published method as closely as open tools allow, and
+every one of them is listed and explained below so you can change any of them
+deliberately for your own work.
 A run records what it resolved each setting to, so a result can always be
 traced back to the configuration that produced it.
 
 ---
 
-## Why 2.0 and not 1.1
+## Why Version 2.0 and not 1.0
 
-1.0.0 is the only version released. This one does not reproduce it: the
-ground filter's working grid, the interpolation engine and the coverage edge
-have all changed, and the same point cloud yields a visibly different surface.
-Products from 1.0 and 2.0 should not be mixed in one study, and a major
-version is how that gets said.
+Version 2.0 produces slightly better data output: the ground filter's working
+grid, the interpolation engine and the coverage edge have all changed, and the
+same point cloud yields a visibly different surface. Also, Replicalm v2.0 has
+an improved user interface. For integrity of results, products from 1.0 and
+2.0 should not be mixed in one study. A download for the Windows-compatible
+installer is available on this page.
 
 ---
 

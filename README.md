@@ -6,7 +6,7 @@
 
 Two archived records, deliberately separate. The badge above is the
 **source**, which is what stays reproducible. The **Windows installer** is
-archived on its own at [10.5281/zenodo.23110800](https://doi.org/10.5281/zenodo.23110800), because a compiled
+archived on its own at [10.5281/zenodo.23110799](https://doi.org/10.5281/zenodo.23110799), because a compiled
 distribution and the source it was built from are different artefacts and a
 reader may want to cite either.
 
@@ -21,6 +21,16 @@ The published method depends on two commercial products: TerraScan for ground
 classification, and Golden Surfer for interpolation and rasterization. Without
 those licenses the results cannot be reproduced and the method cannot be applied
 to new surveys. This closes that gap.
+
+**What it is for.** Replicalm did not exist when the terrain products for our
+study of the G-LiHT Yucatán surveys were made, and it was not used to make
+them: the DEMs in which the Q2000 model detected 57,181 candidate Maya
+structures were produced with TerraScan and Golden Surfer. Replicalm
+replicates that method with open-source software. It is provided as open
+source for two purposes: so that interested researchers can reproduce our
+method, and so that anyone can use a free tool to ground-filter raw LAS/LAZ
+point clouds, produce filtered DEMs, and make GeoTIFF visualizations of lidar
+data.
 
 ![The Pixoyal group: original workflow, baseline, and Clear](docs/figures/fig10_clear_vs_baseline.png)
 
@@ -350,4 +360,4 @@ Britton, Benjamin J. (2026). *Replicalm* (v2.0.0) [Software]. University of
 Cincinnati. DOI: 10.5281/zenodo.23110738
 
 To cite the installer specifically rather than the source, use
-DOI: 10.5281/zenodo.23110800.
+DOI: 10.5281/zenodo.23110799.
